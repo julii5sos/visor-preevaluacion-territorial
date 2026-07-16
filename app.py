@@ -91,6 +91,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
+APP_VERSION = "1.2.1"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
 ASSET_CUENCA = (
@@ -762,6 +763,8 @@ def descargar_miniatura(imagen, geometria):
         headers={"User-Agent": "visor-preevaluacion-territorial/1.0"},
     )
     respuesta.raise_for_status()
+    if len(respuesta.content) < 1000 or not respuesta.content.startswith(b"\x89PNG"):
+        raise RuntimeError("Earth Engine no devolvió una imagen PNG válida.")
     return respuesta.content
 
 
@@ -833,6 +836,7 @@ def generar_mapas_reporte(
     ]
 
     mapas = []
+    errores = []
     for titulo, imagen, leyenda in especificaciones:
         try:
             mapas.append(
@@ -842,9 +846,10 @@ def generar_mapas_reporte(
                     "leyenda": leyenda,
                 }
             )
-        except Exception:
+        except Exception as error:
             mapas.append({"titulo": titulo, "imagen": None, "leyenda": leyenda})
-    return mapas
+            errores.append(f"{titulo}: {type(error).__name__}")
+    return mapas, errores
 
 
 # -----------------------------------------------------------------------------
@@ -1414,6 +1419,7 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+st.caption(f"Versión {APP_VERSION} · Informe PDF con mapas temáticos")
 
 with st.expander("Cómo utilizar el visor", expanded=False):
     st.markdown(
@@ -1458,6 +1464,7 @@ try:
             st.session_state.pop("resultados_analisis", None)
             st.session_state.pop("pdf_analisis", None)
             st.session_state.pop("firma_analisis", None)
+            st.session_state.pop("errores_mapas", None)
             st.session_state["version_mapa_dibujo"] = version_mapa_dibujo + 1
             st.rerun()
 
@@ -1711,7 +1718,7 @@ try:
                 anio_esri_final,
                 geometria_dibujada_json,
             )
-            mapas_reporte = generar_mapas_reporte(
+            mapas_reporte, errores_mapas = generar_mapas_reporte(
                 tipo_area,
                 finca_seleccionada,
                 anio_tmf_final,
@@ -1720,18 +1727,21 @@ try:
                 anio_ndvi_inicial,
                 geometria_dibujada_json,
             )
-            pdf_nuevo = generar_pdf(
-                nombre_area,
-                resultados_nuevos,
-                anio_tmf_final,
-                anio_esri_inicial,
-                anio_esri_final,
-                anio_ndvi_inicial,
-                mapas_reporte,
-            )
             st.session_state["resultados_analisis"] = resultados_nuevos
-            st.session_state["pdf_analisis"] = pdf_nuevo
             st.session_state["firma_analisis"] = firma_actual
+            st.session_state["errores_mapas"] = errores_mapas
+            if any(mapa.get("imagen") for mapa in mapas_reporte):
+                st.session_state["pdf_analisis"] = generar_pdf(
+                    nombre_area,
+                    resultados_nuevos,
+                    anio_tmf_final,
+                    anio_esri_inicial,
+                    anio_esri_final,
+                    anio_ndvi_inicial,
+                    mapas_reporte,
+                )
+            else:
+                st.session_state.pop("pdf_analisis", None)
 
     if st.session_state.get("firma_analisis") == firma_actual:
         resultados = st.session_state["resultados_analisis"]
@@ -1741,15 +1751,32 @@ try:
             anio_esri_inicial,
             anio_esri_final,
         )
-        nombre_archivo = re.sub(r"[^A-Za-z0-9_-]+", "_", nombre_area).strip("_").lower()
-        st.download_button(
-            "Descargar informe PDF con mapas",
-            data=st.session_state["pdf_analisis"],
-            file_name=f"ficha_preevaluacion_{nombre_archivo}.pdf",
-            mime="application/pdf",
-            type="primary",
-            use_container_width=True,
-        )
+        errores_mapas = st.session_state.get("errores_mapas", [])
+        if errores_mapas:
+            disponibles = 6 - len(errores_mapas)
+            if disponibles:
+                st.warning(
+                    f"El informe contiene {disponibles} de 6 mapas. Algunas imágenes "
+                    "no estuvieron disponibles temporalmente; puede ejecutar nuevamente el análisis."
+                )
+            else:
+                st.error(
+                    "Earth Engine no entregó las imágenes cartográficas. No se generó un PDF "
+                    "incompleto. Ejecute nuevamente la preevaluación y, si continúa, envíe el "
+                    "detalle técnico mostrado abajo."
+                )
+            with st.expander("Detalle de los mapas no disponibles", expanded=False):
+                st.code("\n".join(errores_mapas))
+        if st.session_state.get("pdf_analisis"):
+            nombre_archivo = re.sub(r"[^A-Za-z0-9_-]+", "_", nombre_area).strip("_").lower()
+            st.download_button(
+                "Descargar informe PDF con mapas",
+                data=st.session_state["pdf_analisis"],
+                file_name=f"ficha_preevaluacion_{nombre_archivo}.pdf",
+                mime="application/pdf",
+                type="primary",
+                use_container_width=True,
+            )
     elif "resultados_analisis" in st.session_state:
         st.warning(
             "Cambió el área o el período. Ejecute nuevamente la preevaluación para "
