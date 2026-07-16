@@ -1,0 +1,29 @@
+def clave_orden_natural(valor):
+    partes = re.split(r"(\d+)", str(valor).strip())
+
+    return tuple(
+        (0, int(parte))
+        if parte.isdigit()
+        else (1, parte.casefold())
+        for parte in partes
+        if parte
+    )
+
+
+@st.cache_data(ttl=3600)
+def obtener_ids_fincas():
+    fincas = ee.FeatureCollection(ASSET_FINCAS)
+
+    valores = (
+        fincas.aggregate_array("FincaID")
+        .distinct()
+        .getInfo()
+    )
+
+    ids = [
+        str(valor).strip()
+        for valor in valores
+        if valor is not None
+    ]
+
+    return sorted(ids, key=clave_orden_natural)
