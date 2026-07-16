@@ -1,5 +1,5 @@
 streamlit
 reportlab
 earthengine-api
-folium
-streamlit-folium
+folium==0.20.0
+streamlit-folium==0.27.2
