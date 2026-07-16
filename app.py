@@ -304,4 +304,131 @@ try:
         .getInfo()
     )
 
-    columna_1, columna_2 =
+    columna_1, columna_2 = st.columns(2)
+
+    with columna_1:
+        st.metric(
+            "Área seleccionada",
+            nombre_area,
+        )
+
+    with columna_2:
+        st.metric(
+            "Superficie aproximada",
+            f"{superficie_ha:,.1f} ha",
+        )
+
+    mapa = folium.Map(
+        location=[8.7, -80.0],
+        zoom_start=8,
+        tiles=None,
+        control_scale=True,
+    )
+
+    folium.TileLayer(
+        tiles=(
+            "https://server.arcgisonline.com/"
+            "ArcGIS/rest/services/World_Imagery/"
+            "MapServer/tile/{z}/{y}/{x}"
+        ),
+        attr="Esri",
+        name="Imagen satelital",
+        overlay=False,
+        control=True,
+        max_zoom=20,
+    ).add_to(mapa)
+
+    imagen_cuenca = cuenca.style(
+        color="FF4444",
+        fillColor="00000000",
+        width=3,
+    )
+
+    imagen_fincas = fincas.style(
+        color="CC55FF",
+        fillColor="00000000",
+        width=2,
+    )
+
+    imagen_seleccion = (
+        area_seleccionada.style(
+            color="00FFFF",
+            fillColor="00FFFF22",
+            width=4,
+        )
+    )
+
+    agregar_capa_ee(
+        mapa=mapa,
+        imagen=imagen_cuenca,
+        parametros={},
+        nombre="Límite de la cuenca",
+        mostrar=True,
+    )
+
+    agregar_capa_ee(
+        mapa=mapa,
+        imagen=imagen_fincas,
+        parametros={},
+        nombre="Fincas de monitoreo",
+        mostrar=(
+            tipo_area
+            == "Finca de monitoreo"
+        ),
+    )
+
+    agregar_capa_ee(
+        mapa=mapa,
+        imagen=imagen_seleccion,
+        parametros={},
+        nombre="Área seleccionada",
+        mostrar=True,
+    )
+
+    mapa.fit_bounds(
+        obtener_limites(
+            area_seleccionada
+        )
+    )
+
+    folium.LayerControl(
+        collapsed=False
+    ).add_to(mapa)
+
+    st.subheader(
+        "Mapa del área evaluada"
+    )
+
+    st_folium(
+        mapa,
+        width=1200,
+        height=650,
+        returned_objects=[],
+        key=(
+            f"mapa-{tipo_area}-"
+            f"{nombre_area}"
+        ),
+    )
+
+    archivo_pdf = generar_pdf(
+        nombre_area=nombre_area,
+        superficie_ha=superficie_ha,
+    )
+
+    st.download_button(
+        label="Descargar ficha PDF",
+        data=archivo_pdf,
+        file_name=(
+            "ficha_preevaluacion_"
+            "territorial.pdf"
+        ),
+        mime="application/pdf",
+        type="primary",
+    )
+
+except Exception as error:
+    st.error(
+        "No fue posible cargar el visor territorial."
+    )
+
+    st.exception(error)
