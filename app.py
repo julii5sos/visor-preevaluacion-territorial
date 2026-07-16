@@ -7,7 +7,7 @@ import ee
 import folium
 import requests
 import streamlit as st
-from folium.plugins import Fullscreen, SideBySideLayers
+from folium.plugins import Draw, Fullscreen, SideBySideLayers
 from google.oauth2 import service_account
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
@@ -305,8 +305,10 @@ def iniciar_earth_engine():
 
 
 def nombre_area_legible(tipo_area, finca_id=None):
-    if tipo_area != "Finca de monitoreo":
+    if tipo_area == "Toda la cuenca":
         return "Cuenca hidrográfica de interés"
+    if tipo_area == "Dibujar polígono en el mapa":
+        return "Polígono dibujado por el usuario"
     nombre = str(finca_id).strip()
     return nombre if nombre.casefold().startswith("finca") else f"Finca {nombre}"
 
@@ -334,12 +336,35 @@ def obtener_ids_fincas():
     )
 
 
-def obtener_area(tipo_area, finca_id=None):
+def obtener_area(tipo_area, finca_id=None, geometria_geojson=None):
     if tipo_area == "Finca de monitoreo":
         return ee.FeatureCollection(ASSET_FINCAS).filter(
             ee.Filter.eq("FincaID", finca_id)
         )
+    if tipo_area == "Dibujar polígono en el mapa":
+        if not geometria_geojson:
+            raise ValueError("Debe dibujar un polígono antes de ejecutar el análisis.")
+        datos_geometria = (
+            json.loads(geometria_geojson)
+            if isinstance(geometria_geojson, str)
+            else geometria_geojson
+        )
+        geometria = ee.Geometry(datos_geometria)
+        geometria_cuenca = ee.FeatureCollection(ASSET_CUENCA).geometry()
+        geometria_recortada = geometria.intersection(geometria_cuenca, 1)
+        return ee.FeatureCollection(
+            [ee.Feature(geometria_recortada, {"Origen": "Dibujo del usuario"})]
+        )
     return ee.FeatureCollection(ASSET_CUENCA)
+
+
+def serializar_poligono_dibujado(dibujo):
+    geometria = dibujo.get("geometry", dibujo) if dibujo else None
+    if not isinstance(geometria, dict):
+        raise ValueError("No fue posible interpretar la geometría dibujada.")
+    if geometria.get("type") not in {"Polygon", "MultiPolygon"}:
+        raise ValueError("La figura debe ser un polígono cerrado.")
+    return json.dumps(geometria, sort_keys=True, separators=(",", ":"))
 
 
 def obtener_limites(objeto):
@@ -553,8 +578,9 @@ def ejecutar_analisis(
     anio_tmf,
     anio_esri_inicial,
     anio_esri_final,
+    geometria_geojson=None,
 ):
-    area_fc = obtener_area(tipo_area, finca_id)
+    area_fc = obtener_area(tipo_area, finca_id, geometria_geojson)
     geometria = area_fc.geometry()
     area_ha = float(geometria.area(1).divide(10000).getInfo())
 
@@ -747,8 +773,9 @@ def generar_mapas_reporte(
     anio_esri_inicial,
     anio_esri_final,
     anio_ndvi_inicial,
+    geometria_geojson=None,
 ):
-    area_fc = obtener_area(tipo_area, finca_id)
+    area_fc = obtener_area(tipo_area, finca_id, geometria_geojson)
     geometria = area_fc.geometry()
     tmf = obtener_tmf(anio_tmf, geometria)
     gedi = imagen_gedi(geometria)
@@ -1391,7 +1418,7 @@ st.markdown(
 with st.expander("Cómo utilizar el visor", expanded=False):
     st.markdown(
         """
-        1. **Seleccione una finca** en la barra lateral.
+        1. **Seleccione una finca, dibuje un polígono o elija toda la cuenca**.
         2. **Elija qué desea revisar**; la opción recomendada configura las capas automáticamente.
         3. Pulse **Ejecutar preevaluación** y espere los resultados.
         4. Revise los mapas y descargue la ficha PDF con el diagnóstico y las imágenes.
@@ -1406,10 +1433,12 @@ try:
     st.sidebar.markdown("## 1. Área que desea evaluar")
     tipo_area = st.sidebar.radio(
         "Seleccione una opción:",
-        ["Finca de monitoreo", "Toda la cuenca"],
+        ["Finca de monitoreo", "Dibujar polígono en el mapa", "Toda la cuenca"],
         help="Se recomienda iniciar con una finca. El análisis de toda la cuenca puede tardar varios minutos.",
     )
     finca_seleccionada = None
+    geometria_dibujada_json = st.session_state.get("geometria_dibujada_json")
+    version_mapa_dibujo = st.session_state.get("version_mapa_dibujo", 0)
     if tipo_area == "Finca de monitoreo":
         finca_seleccionada = st.sidebar.selectbox(
             "Finca:",
@@ -1417,11 +1446,118 @@ try:
             format_func=str,
             help="Las fincas están ordenadas de forma natural: 1, 2, 3...",
         )
+    elif tipo_area == "Dibujar polígono en el mapa":
+        st.subheader("1. Dibuje el área que desea evaluar")
+        st.markdown(
+            "Seleccione la herramienta de polígono en el mapa, marque los vértices y "
+            "haga clic en el primer punto para cerrar la figura. El área se limitará "
+            "automáticamente a la cuenca hidrográfica."
+        )
+        if geometria_dibujada_json and st.button("Borrar polígono y dibujar otro"):
+            st.session_state.pop("geometria_dibujada_json", None)
+            st.session_state.pop("resultados_analisis", None)
+            st.session_state.pop("pdf_analisis", None)
+            st.session_state.pop("firma_analisis", None)
+            st.session_state["version_mapa_dibujo"] = version_mapa_dibujo + 1
+            st.rerun()
+
+        mapa_dibujo = folium.Map(
+            location=[8.7, -80.0],
+            zoom_start=8,
+            tiles=None,
+            control_scale=True,
+        )
+        folium.TileLayer(
+            tiles=(
+                "https://server.arcgisonline.com/ArcGIS/rest/services/"
+                "World_Imagery/MapServer/tile/{z}/{y}/{x}"
+            ),
+            attr="Esri",
+            name="Imagen satelital",
+            overlay=False,
+            control=False,
+            max_zoom=20,
+        ).add_to(mapa_dibujo)
+        cuenca_dibujo = ee.FeatureCollection(ASSET_CUENCA)
+        capa_gee(
+            mapa_dibujo,
+            cuenca_dibujo.style(color="FF4444", fillColor="00000000", width=3),
+            {},
+            "Límite de la cuenca",
+            control=False,
+        )
+        if geometria_dibujada_json:
+            folium.GeoJson(
+                json.loads(geometria_dibujada_json),
+                name="Polígono dibujado",
+                style_function=lambda _: {
+                    "color": "#00E5FF",
+                    "weight": 4,
+                    "fillColor": "#00E5FF",
+                    "fillOpacity": 0.12,
+                },
+            ).add_to(mapa_dibujo)
+        Draw(
+            export=False,
+            position="topleft",
+            draw_options={
+                "polyline": False,
+                "rectangle": False,
+                "circle": False,
+                "marker": False,
+                "circlemarker": False,
+                "polygon": {
+                    "allowIntersection": False,
+                    "showArea": True,
+                    "shapeOptions": {"color": "#00E5FF", "weight": 4},
+                },
+            },
+            edit_options={"edit": True, "remove": True},
+        ).add_to(mapa_dibujo)
+        mapa_dibujo.fit_bounds(obtener_limites(cuenca_dibujo))
+        resultado_dibujo = st_folium(
+            mapa_dibujo,
+            height=520,
+            use_container_width=True,
+            returned_objects=["all_drawings"],
+            key=f"mapa-seleccion-poligono-{version_mapa_dibujo}",
+        )
+        dibujos = (resultado_dibujo or {}).get("all_drawings") or []
+        if dibujos:
+            nuevo_poligono = serializar_poligono_dibujado(dibujos[-1])
+            if nuevo_poligono != geometria_dibujada_json:
+                st.session_state["geometria_dibujada_json"] = nuevo_poligono
+                st.rerun()
+        geometria_dibujada_json = st.session_state.get("geometria_dibujada_json")
+        if not geometria_dibujada_json:
+            st.info("Dibuje un polígono para continuar con la preevaluación.")
+            st.stop()
+        st.success(
+            "Polígono listo. Puede continuar con el tipo de revisión y ejecutar la preevaluación."
+        )
     nombre_area = nombre_area_legible(tipo_area, finca_seleccionada)
 
-    area_seleccionada = obtener_area(tipo_area, finca_seleccionada)
+    area_seleccionada = obtener_area(
+        tipo_area,
+        finca_seleccionada,
+        geometria_dibujada_json,
+    )
     geometria = area_seleccionada.geometry()
     superficie_ha = float(geometria.area(1).divide(10000).getInfo())
+    if tipo_area == "Dibujar polígono en el mapa":
+        superficie_original_ha = float(
+            ee.Geometry(json.loads(geometria_dibujada_json))
+            .area(1)
+            .divide(10000)
+            .getInfo()
+        )
+        if superficie_ha <= 0:
+            st.error("El polígono no intersecta la cuenca. Bórrelo y dibuje uno dentro del límite rojo.")
+            st.stop()
+        if superficie_ha + 0.01 < superficie_original_ha:
+            st.warning(
+                "Una parte del polígono estaba fuera de la cuenca y fue excluida del análisis."
+            )
 
     st.sidebar.markdown("## 2. ¿Qué desea revisar?")
     objetivo = st.sidebar.selectbox(
@@ -1558,6 +1694,7 @@ try:
         anio_esri_inicial,
         anio_esri_final,
         anio_ndvi_inicial,
+        geometria_dibujada_json,
     )
     if st.button(
         "Ejecutar preevaluación",
@@ -1572,6 +1709,7 @@ try:
                 anio_tmf_final,
                 anio_esri_inicial,
                 anio_esri_final,
+                geometria_dibujada_json,
             )
             mapas_reporte = generar_mapas_reporte(
                 tipo_area,
@@ -1580,6 +1718,7 @@ try:
                 anio_esri_inicial,
                 anio_esri_final,
                 anio_ndvi_inicial,
+                geometria_dibujada_json,
             )
             pdf_nuevo = generar_pdf(
                 nombre_area,
@@ -1794,7 +1933,8 @@ try:
         key=(
             f"mapa-{tipo_area}-{finca_seleccionada}-{modo_comparador}-"
             f"{anio_tmf_inicial}-{anio_tmf_final}-{anio_esri_inicial}-"
-            f"{anio_esri_final}-{anio_ndvi_inicial}-{'-'.join(capas_activas)}"
+            f"{anio_esri_final}-{anio_ndvi_inicial}-{'-'.join(capas_activas)}-"
+            f"{hash(geometria_dibujada_json or '')}"
         ),
     )
 

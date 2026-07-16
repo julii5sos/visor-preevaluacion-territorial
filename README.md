@@ -7,7 +7,7 @@ cumplimiento EUDR.
 
 ## Flujo para el usuario
 
-1. Seleccionar una finca o, para un resumen regional, toda la cuenca.
+1. Seleccionar una finca, dibujar un polígono o, para un resumen regional, toda la cuenca.
 2. Elegir un objetivo de revisión:
    - panorama general;
    - cambios de uso del suelo;
@@ -19,6 +19,14 @@ cumplimiento EUDR.
 
 Los períodos y las capas recomendadas se configuran automáticamente. Los controles
 técnicos permanecen disponibles en **Configuración avanzada**.
+
+### Área dibujada
+
+La opción **Dibujar polígono en el mapa** permite delimitar un área personalizada
+directamente sobre la imagen satelital. El visor acepta polígonos cerrados, conserva
+el último dibujo durante la sesión y recorta automáticamente cualquier porción que
+quede fuera de la cuenca hidrográfica. El análisis, los mapas y el PDF utilizan la
+geometría resultante.
 
 ## Fuentes incorporadas
 
