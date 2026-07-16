@@ -1,4 +1,5 @@
 streamlit
 reportlab
 earthengine-api
-geemap[streamlit]
+folium
+streamlit-folium
