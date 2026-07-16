@@ -5,6 +5,7 @@ from io import BytesIO
 
 import ee
 import folium
+import requests
 import streamlit as st
 from folium.plugins import Fullscreen, SideBySideLayers
 from google.oauth2 import service_account
@@ -14,6 +15,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.platypus import (
+    Image as ReportLabImage,
     PageBreak,
     Paragraph,
     SimpleDocTemplate,
@@ -33,10 +35,33 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    .block-container {padding-top: 1.5rem; padding-bottom: 2rem;}
+    .block-container {padding-top: 1.25rem; padding-bottom: 2rem; max-width: 1500px;}
     [data-testid="stMetricValue"] {font-size: 1.8rem;}
     [data-testid="stSidebar"] * {overflow-wrap: anywhere;}
     iframe {max-width: 100% !important;}
+    .cabecera-app {
+        padding: 1.25rem 1.4rem;
+        border-radius: .8rem;
+        background: linear-gradient(135deg, #17351f 0%, #2f6338 100%);
+        color: white;
+        margin-bottom: 1rem;
+    }
+    .cabecera-app h1 {margin: 0; font-size: 2rem; line-height: 1.15; color: white;}
+    .cabecera-app p {margin: .55rem 0 0; color: #e8f2e7; max-width: 950px;}
+    .paso-guia {
+        padding: .75rem .9rem;
+        border-left: 4px solid #3f7d44;
+        background: #f4f8f2;
+        border-radius: 0 .5rem .5rem 0;
+        margin: .35rem 0 .85rem;
+    }
+    .tarjeta-resumen {
+        border: 1px solid rgba(47,99,56,.25);
+        border-radius: .65rem;
+        padding: .85rem 1rem;
+        background: #fbfdf9;
+        height: 100%;
+    }
     .leyenda-fila {
         display: flex;
         align-items: center;
@@ -66,7 +91,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-PROYECTO_EE = st.secrets["EE_PROJECT"]
+PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
 ASSET_CUENCA = (
     "projects/ee-julissaguevaravega/assets/"
@@ -134,6 +159,11 @@ VIS_HANSEN_PRE = {
     "max": 20,
     "palette": ["FFF9C4", "F9A825", "E65100", "C62828"],
 }
+VIS_HANSEN_TOTAL = {
+    "min": 1,
+    "max": 25,
+    "palette": ["FFF9C4", "F9A825", "E65100", "FF1744", "7F0000"],
+}
 VIS_LINEA_BASE = {"min": 1, "max": 1, "palette": ["00C853"]}
 VIS_TMF_DEFOR = {"min": 1, "max": 1, "palette": ["FF0000"]}
 VIS_TMF_DEGRAD = {"min": 1, "max": 1, "palette": ["FFCC00"]}
@@ -156,6 +186,34 @@ VIS_NDVI_CLASES = {
     "min": 0,
     "max": 4,
     "palette": ["B30000", "F4A582", "FFFFBF", "78C679", "006837"],
+}
+VIS_RGB = {"min": 150, "max": 3200, "gamma": 1.15, "bands": ["B4", "B3", "B2"]}
+
+PERFILES_VISUALIZACION = {
+    "Panorama general (recomendado)": {
+        "descripcion": "Reúne las principales señales de bosque y pérdida arbórea.",
+        "comparador": "JRC TMF",
+        "capas": [
+            "Pérdida Hansen post-2020",
+            "Deforestación JRC",
+            "Degradación JRC",
+        ],
+    },
+    "Cambios de uso del suelo": {
+        "descripcion": "Compara árboles, cultivos, pastizales y otras coberturas.",
+        "comparador": "ESRI LULC",
+        "capas": ["Uso y cobertura ESRI", "Transiciones ESRI"],
+    },
+    "Condición de la vegetación": {
+        "descripcion": "Muestra vigor vegetal, cambios recientes y altura del dosel.",
+        "comparador": "Sin comparador",
+        "capas": ["Altura GEDI", "ΔNDVI", "Vegetación NDVI"],
+    },
+    "Exploración personalizada": {
+        "descripcion": "Permite elegir cada fuente, capa y período de análisis.",
+        "comparador": "JRC TMF",
+        "capas": ["Pérdida Hansen post-2020"],
+    },
 }
 
 LEYENDAS = {
@@ -226,7 +284,15 @@ LEYENDAS = {
 
 @st.cache_resource
 def iniciar_earth_engine():
-    informacion = json.loads(st.secrets["EE_SERVICE_ACCOUNT_JSON"])
+    secreto = st.secrets.get("EE_SERVICE_ACCOUNT_JSON")
+    if secreto is None:
+        raise RuntimeError(
+            "Falta EE_SERVICE_ACCOUNT_JSON en los secretos de esta aplicación."
+        )
+    if isinstance(secreto, str):
+        informacion = json.loads(secreto)
+    else:
+        informacion = dict(secreto)
     credenciales = service_account.Credentials.from_service_account_info(
         informacion,
         scopes=[
@@ -236,6 +302,13 @@ def iniciar_earth_engine():
     )
     ee.Initialize(credentials=credenciales, project=PROYECTO_EE)
     return True
+
+
+def nombre_area_legible(tipo_area, finca_id=None):
+    if tipo_area != "Finca de monitoreo":
+        return "Cuenca hidrográfica de interés"
+    nombre = str(finca_id).strip()
+    return nombre if nombre.casefold().startswith("finca") else f"Finca {nombre}"
 
 
 def clave_orden_natural(valor):
@@ -316,6 +389,33 @@ def mascara_sentinel_scl(imagen):
     scl = imagen.select("SCL")
     mascara = scl.eq(4).Or(scl.eq(5)).Or(scl.eq(6)).Or(scl.eq(11))
     return imagen.updateMask(mascara).select(["B8", "B4"]).toFloat()
+
+
+def mascara_sentinel_rgb(imagen):
+    scl = imagen.select("SCL")
+    mascara = scl.eq(4).Or(scl.eq(5)).Or(scl.eq(6)).Or(scl.eq(11))
+    return imagen.updateMask(mascara).select(["B4", "B3", "B2"]).toFloat()
+
+
+def obtener_rgb_sentinel(anio, geometria):
+    coleccion = (
+        ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
+        .filterBounds(geometria)
+        .filterDate(f"{anio}-01-01", f"{anio}-12-31")
+        .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 80))
+        .map(mascara_sentinel_rgb)
+    )
+    respaldo = (
+        ee.Image.constant([0, 0, 0])
+        .rename(["B4", "B3", "B2"])
+        .updateMask(ee.Image(0))
+        .toFloat()
+    )
+    return (
+        coleccion.merge(ee.ImageCollection.fromImages([respaldo]))
+        .median()
+        .clip(geometria)
+    )
 
 
 def obtener_ndvi(anio, geometria):
@@ -432,6 +532,20 @@ def numero(diccionario, clave):
     return float(valor) if valor is not None else 0.0
 
 
+def reducir_superficies(imagen, geometria, escala, proyeccion=None):
+    parametros = {
+        "reducer": ee.Reducer.sum(),
+        "geometry": geometria,
+        "scale": escala,
+        "bestEffort": True,
+        "maxPixels": 1e9,
+        "tileScale": 4,
+    }
+    if proyeccion is not None:
+        parametros["crs"] = proyeccion
+    return imagen.reduceRegion(**parametros).getInfo()
+
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def ejecutar_analisis(
     tipo_area,
@@ -451,30 +565,52 @@ def ejecutar_analisis(
     gedi = imagen_gedi(geometria)
     pixel_ha = ee.Image.pixelArea().divide(10000)
 
-    areas = ee.Image.cat(
+    # Cada fuente se reduce en su propia resolución y proyección. Esto evita
+    # forzar los datos ESRI de 10 m a la malla de los productos de 30 m.
+    areas_tmf = ee.Image.cat(
         [
-            tmf.eq(1).multiply(pixel_ha).rename("tmf_estable"),
-            tmf.eq(2).multiply(pixel_ha).rename("tmf_degradacion"),
-            tmf.eq(3).multiply(pixel_ha).rename("tmf_deforestacion"),
-            tmf.eq(4).multiply(pixel_ha).rename("tmf_recuperacion"),
-            perdida_post.mask().multiply(pixel_ha).rename("hansen_post"),
-            perdida_pre.mask().multiply(pixel_ha).rename("hansen_pre"),
-            linea_base.mask().multiply(pixel_ha).rename("linea_base"),
-            esri_final.eq(2).multiply(pixel_ha).rename("esri_arboles_final"),
-            esri_inicial.eq(2).And(esri_final.neq(2)).multiply(pixel_ha).rename("esri_salida"),
-            esri_inicial.neq(2).And(esri_final.eq(2)).multiply(pixel_ha).rename("esri_ganancia"),
-            esri_inicial.eq(2).And(esri_final.eq(2)).multiply(pixel_ha).rename("esri_estable"),
+            tmf.eq(1).unmask(0).multiply(pixel_ha).rename("tmf_estable"),
+            tmf.eq(2).unmask(0).multiply(pixel_ha).rename("tmf_degradacion"),
+            tmf.eq(3).unmask(0).multiply(pixel_ha).rename("tmf_deforestacion"),
+            tmf.eq(4).unmask(0).multiply(pixel_ha).rename("tmf_recuperacion"),
         ]
-    ).unmask(0)
+    )
+    areas_hansen = ee.Image.cat(
+        [
+            perdida_post.gt(0).unmask(0).multiply(pixel_ha).rename("hansen_post"),
+            perdida_pre.gt(0).unmask(0).multiply(pixel_ha).rename("hansen_pre"),
+            linea_base.unmask(0).multiply(pixel_ha).rename("linea_base"),
+        ]
+    )
+    areas_esri = ee.Image.cat(
+        [
+            esri_final.eq(2).unmask(0).multiply(pixel_ha).rename("esri_arboles_final"),
+            esri_inicial.eq(2).And(esri_final.neq(2)).unmask(0).multiply(pixel_ha).rename("esri_salida"),
+            esri_inicial.neq(2).And(esri_final.eq(2)).unmask(0).multiply(pixel_ha).rename("esri_ganancia"),
+            esri_inicial.eq(2).And(esri_final.eq(2)).unmask(0).multiply(pixel_ha).rename("esri_estable"),
+        ]
+    )
 
-    resumen_areas = areas.reduceRegion(
-        reducer=ee.Reducer.sum(),
-        geometry=geometria,
-        scale=30,
-        bestEffort=True,
-        maxPixels=1e9,
-        tileScale=4,
-    ).getInfo()
+    resumen_areas = {}
+    resumen_areas.update(
+        reducir_superficies(areas_tmf, geometria, 30, tmf.projection())
+    )
+    resumen_areas.update(
+        reducir_superficies(
+            areas_hansen,
+            geometria,
+            30,
+            ee.Image(HANSEN_ASSET).projection(),
+        )
+    )
+    resumen_areas.update(
+        reducir_superficies(
+            areas_esri,
+            geometria,
+            10,
+            esri_final.projection(),
+        )
+    )
 
     resumen_gedi = ee.Dictionary(
         {
@@ -571,54 +707,226 @@ def texto_recomendacion(prioridad):
     }[prioridad]
 
 
+def visualizar_con_borde(imagen, visualizacion, area_fc, fondo=None):
+    visual = ee.Image(imagen).visualize(**visualizacion)
+    if fondo is not None:
+        visual = ee.Image(fondo).visualize(**VIS_RGB).blend(visual)
+    borde = (
+        ee.Image()
+        .byte()
+        .paint(featureCollection=area_fc, color=1, width=4)
+        .selfMask()
+        .visualize(min=1, max=1, palette=["00E5FF"])
+    )
+    return visual.blend(borde)
+
+
+def descargar_miniatura(imagen, geometria):
+    region = geometria.bounds(1).coordinates().getInfo()
+    url = ee.Image(imagen).getThumbURL(
+        {
+            "region": region,
+            "dimensions": "1200x760",
+            "format": "png",
+        }
+    )
+    respuesta = requests.get(
+        url,
+        timeout=60,
+        headers={"User-Agent": "visor-preevaluacion-territorial/1.0"},
+    )
+    respuesta.raise_for_status()
+    return respuesta.content
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def generar_mapas_reporte(
+    tipo_area,
+    finca_id,
+    anio_tmf,
+    anio_esri_inicial,
+    anio_esri_final,
+    anio_ndvi_inicial,
+):
+    area_fc = obtener_area(tipo_area, finca_id)
+    geometria = area_fc.geometry()
+    tmf = obtener_tmf(anio_tmf, geometria)
+    gedi = imagen_gedi(geometria)
+    ndvi_final = obtener_ndvi(ANO_NDVI_MAX, geometria)
+    ndvi_inicial = obtener_ndvi(anio_ndvi_inicial, geometria)
+    delta_ndvi = ndvi_final.subtract(ndvi_inicial).rename("delta_ndvi")
+
+    hansen = ee.Image(HANSEN_ASSET).select("lossyear")
+    rgb = obtener_rgb_sentinel(ANO_NDVI_MAX, geometria)
+
+    especificaciones = [
+        (
+            f"ESRI - Uso y cobertura {anio_esri_final}",
+            visualizar_con_borde(
+                obtener_esri_visual(anio_esri_final, geometria),
+                VIS_ESRI,
+                area_fc,
+            ),
+            "Azul: agua | Verde: árboles | Amarillo: cultivos | Rojo: construido | Beige: pastizal",
+        ),
+        (
+            f"JRC TMF - Estado forestal {anio_tmf}",
+            visualizar_con_borde(tmf, VIS_TMF, area_fc),
+            "Verde oscuro: bosque estable | Amarillo: degradación | Rojo: deforestación | Verde claro: recuperación",
+        ),
+        (
+            f"Hansen - Pérdida arbórea 2001-{ANO_HANSEN_MAX}",
+            visualizar_con_borde(
+                hansen.updateMask(hansen.gt(0)).clip(geometria),
+                VIS_HANSEN_TOTAL,
+                area_fc,
+                fondo=rgb,
+            ),
+            "Amarillo: pérdida antigua | Naranja: intermedia | Rojo oscuro: pérdida más reciente",
+        ),
+        (
+            "GEDI - Altura del dosel",
+            visualizar_con_borde(gedi, VIS_GEDI, area_fc),
+            "Amarillo claro: dosel bajo | Verde medio: dosel intermedio | Verde oscuro: dosel alto",
+        ),
+        (
+            f"ΔNDVI - Cambio de vigor {anio_ndvi_inicial}-{ANO_NDVI_MAX}",
+            visualizar_con_borde(delta_ndvi, VIS_NDVI_DELTA, area_fc),
+            "Rojo: disminución de vigor | Crema: cambio pequeño | Verde: aumento de vigor",
+        ),
+        (
+            f"Vigor vegetal NDVI - {ANO_NDVI_MAX}",
+            visualizar_con_borde(
+                clasificar_ndvi(ndvi_final),
+                VIS_NDVI_CLASES,
+                area_fc,
+            ),
+            "Rojo: sin vegetación activa | Amarillo: vegetación escasa | Verde: vegetación moderada a densa",
+        ),
+    ]
+
+    mapas = []
+    for titulo, imagen, leyenda in especificaciones:
+        try:
+            mapas.append(
+                {
+                    "titulo": titulo,
+                    "imagen": descargar_miniatura(imagen, geometria),
+                    "leyenda": leyenda,
+                }
+            )
+        except Exception:
+            mapas.append({"titulo": titulo, "imagen": None, "leyenda": leyenda})
+    return mapas
+
+
 # -----------------------------------------------------------------------------
 # PDF institucional
 # -----------------------------------------------------------------------------
 
-def generar_pdf(nombre_area, resultados, anio_tmf, anio_esri_inicial, anio_esri_final):
+def generar_pdf(
+    nombre_area,
+    resultados,
+    anio_tmf,
+    anio_esri_inicial,
+    anio_esri_final,
+    anio_ndvi_inicial,
+    mapas=None,
+):
     memoria = BytesIO()
     documento = SimpleDocTemplate(
         memoria,
         pagesize=A4,
-        rightMargin=1.8 * cm,
-        leftMargin=1.8 * cm,
-        topMargin=1.5 * cm,
-        bottomMargin=1.5 * cm,
+        rightMargin=1.55 * cm,
+        leftMargin=1.55 * cm,
+        topMargin=1.55 * cm,
+        bottomMargin=1.6 * cm,
         title="Ficha de preevaluación territorial",
+        author="Visor de preevaluación territorial",
     )
+
+    verde = colors.HexColor("#244d23")
+    verde_claro = colors.HexColor("#e8f0e3")
+    borde = colors.HexColor("#8aa684")
     estilos = getSampleStyleSheet()
     estilos.add(
         ParagraphStyle(
             name="TituloFicha",
             parent=estilos["Title"],
-            fontName="Helvetica-Bold",
+            fontName="Times-Bold",
             fontSize=15,
-            leading=19,
+            leading=18,
             alignment=TA_CENTER,
-            textColor=colors.HexColor("#244d23"),
-            spaceAfter=12,
+            textColor=verde,
+            spaceAfter=8,
+        )
+    )
+    estilos.add(
+        ParagraphStyle(
+            name="SubtituloFicha",
+            parent=estilos["BodyText"],
+            fontName="Times-Italic",
+            fontSize=9,
+            leading=11,
+            alignment=TA_CENTER,
+            textColor=colors.HexColor("#4d5f4c"),
+            spaceAfter=10,
         )
     )
     estilos.add(
         ParagraphStyle(
             name="SeccionFicha",
             parent=estilos["Heading2"],
-            fontName="Helvetica-Bold",
-            fontSize=11,
-            leading=14,
-            textColor=colors.HexColor("#244d23"),
-            spaceBefore=10,
-            spaceAfter=6,
+            fontName="Times-Bold",
+            fontSize=10.5,
+            leading=13,
+            textColor=verde,
+            spaceBefore=8,
+            spaceAfter=4,
         )
     )
     estilos.add(
         ParagraphStyle(
             name="CuerpoFicha",
             parent=estilos["BodyText"],
-            fontName="Helvetica",
-            fontSize=9.5,
-            leading=13,
-            spaceAfter=6,
+            fontName="Times-Roman",
+            fontSize=9.2,
+            leading=12.2,
+            alignment=4,
+            spaceAfter=5,
+        )
+    )
+    estilos.add(
+        ParagraphStyle(
+            name="MapaTitulo",
+            parent=estilos["BodyText"],
+            fontName="Times-Bold",
+            fontSize=8.6,
+            leading=10,
+            alignment=TA_CENTER,
+            textColor=verde,
+            spaceAfter=3,
+        )
+    )
+    estilos.add(
+        ParagraphStyle(
+            name="MapaNota",
+            parent=estilos["BodyText"],
+            fontName="Times-Roman",
+            fontSize=6.8,
+            leading=8,
+            alignment=TA_CENTER,
+            textColor=colors.HexColor("#4d4d4d"),
+        )
+    )
+    estilos.add(
+        ParagraphStyle(
+            name="CabeceraTabla",
+            parent=estilos["BodyText"],
+            fontName="Times-Bold",
+            fontSize=8.8,
+            leading=10,
+            textColor=colors.white,
         )
     )
 
@@ -629,7 +937,6 @@ def generar_pdf(nombre_area, resultados, anio_tmf, anio_esri_inicial, anio_esri_
     fuentes = sum(
         [r["senal_tmf"], r["senal_esri"], r["senal_hansen"], r["senal_gedi"]]
     )
-
     descripcion_cobertura = (
         "mantiene una cobertura arbórea importante"
         if pct_arbol >= 50
@@ -649,168 +956,287 @@ def generar_pdf(nombre_area, resultados, anio_tmf, anio_esri_inicial, anio_esri_
         "Esta coincidencia aumenta la necesidad de revisar los sectores señalados."
         if fuentes >= 2
         else "Las fuentes no muestran el mismo resultado. El cambio puede ser pequeño, "
-        "reciente, temporal o estar en bordes de distintas coberturas."
+        "reciente, temporal o encontrarse en bordes de distintas coberturas."
         if fuentes == 1
         else "Las fuentes evaluadas no muestran señales relevantes de deterioro reciente."
     )
     texto_dosel = (
-        f"La altura promedio del dosel fue de {r['gedi_altura']:.1f} m, con "
-        f"{r['gedi_cobertura_pct']:.0f}% del área cubierta por datos válidos."
+        f"La altura promedio del dosel fue de {r['gedi_altura']:.1f} m. "
+        f"El {r['gedi_cobertura_pct']:.0f}% del área presentó datos válidos en el producto de altura."
         if r["gedi_disponible"]
         else "El producto de altura del dosel no presenta información suficiente para interpretar esta área."
     )
 
-    historia = [Paragraph("FICHA DE PREEVALUACIÓN TERRITORIAL", estilos["TituloFicha"])]
-    datos = [
-        ["Área evaluada", nombre_area],
-        ["Superficie total", f"{area:,.1f} ha"],
-        ["Fecha del análisis", date.today().isoformat()],
+    historia = [
+        Paragraph("FICHA DE PREEVALUACIÓN TERRITORIAL", estilos["TituloFicha"]),
+        Paragraph(
+            "Documento indicativo para orientar revisiones territoriales. No determina cumplimiento EUDR.",
+            estilos["SubtituloFicha"],
+        ),
     ]
-    tabla = Table(datos, colWidths=[4.2 * cm, 12.0 * cm])
+    datos = [
+        [Paragraph("Área evaluada", estilos["CuerpoFicha"]), Paragraph(nombre_area, estilos["CuerpoFicha"])],
+        [Paragraph("Superficie total", estilos["CuerpoFicha"]), Paragraph(f"{area:,.2f} ha", estilos["CuerpoFicha"])],
+        [Paragraph("Fecha del análisis", estilos["CuerpoFicha"]), Paragraph(date.today().strftime("%d/%m/%Y"), estilos["CuerpoFicha"])],
+        [Paragraph("Períodos principales", estilos["CuerpoFicha"]), Paragraph(f"JRC 2020-{anio_tmf} | ESRI {anio_esri_inicial}-{anio_esri_final} | NDVI {anio_ndvi_inicial}-{ANO_NDVI_MAX}", estilos["CuerpoFicha"])],
+    ]
+    tabla = Table(datos, colWidths=[4.0 * cm, 12.5 * cm])
     tabla.setStyle(
         TableStyle(
             [
-                ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#e8f0e3")),
-                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-                ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 9.5),
-                ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#8aa684")),
+                ("BACKGROUND", (0, 0), (0, -1), verde_claro),
+                ("FONTNAME", (0, 0), (0, -1), "Times-Bold"),
+                ("FONTNAME", (1, 0), (1, -1), "Times-Roman"),
+                ("GRID", (0, 0), (-1, -1), 0.4, borde),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 6),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-                ("TOPPADDING", (0, 0), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
             ]
         )
     )
-    historia.extend([tabla, Spacer(1, 8)])
+    historia.extend([tabla, Spacer(1, 7)])
+
+    color_prioridad = {
+        "Alta": "#b71c1c",
+        "Media": "#e65100",
+        "Preventiva": "#b8860b",
+        "Baja": "#2e7d32",
+    }[r["prioridad"]]
+    tarjeta_prioridad = Table(
+        [[Paragraph(
+            f"<b>PRIORIDAD {r['prioridad'].upper()} DE REVISIÓN</b><br/>"
+            f"Índice operativo: {r['puntaje']:.1f}/6.0 - {texto_recomendacion(r['prioridad'])}",
+            ParagraphStyle(
+                "Prioridad",
+                fontName="Times-Roman",
+                fontSize=9.5,
+                leading=12,
+                textColor=colors.white,
+            ),
+        )]],
+        colWidths=[16.5 * cm],
+    )
+    tarjeta_prioridad.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(color_prioridad)),
+                ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor(color_prioridad)),
+                ("LEFTPADDING", (0, 0), (-1, -1), 9),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 9),
+                ("TOPPADDING", (0, 0), (-1, -1), 7),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ]
+        )
+    )
+    metricas = Table(
+        [
+            [
+                Paragraph("Cobertura clasificada como árboles", estilos["CuerpoFicha"]),
+                Paragraph(f"<b>{r['esri_arboles_final']:.1f} ha ({pct_arbol:.1f}%)</b>", estilos["CuerpoFicha"]),
+                Paragraph("Pérdida posterior a 2020", estilos["CuerpoFicha"]),
+                Paragraph(f"<b>{r['hansen_post']:.2f} ha</b>", estilos["CuerpoFicha"]),
+            ],
+            [
+                Paragraph("Deforestación señalada por JRC", estilos["CuerpoFicha"]),
+                Paragraph(f"<b>{r['tmf_deforestacion']:.1f} ha</b>", estilos["CuerpoFicha"]),
+                Paragraph("Altura promedio del dosel", estilos["CuerpoFicha"]),
+                Paragraph(
+                    f"<b>{r['gedi_altura']:.1f} m</b>" if r["gedi_disponible"] else "Datos insuficientes",
+                    estilos["CuerpoFicha"],
+                ),
+            ],
+        ],
+        colWidths=[4.6 * cm, 3.0 * cm, 4.6 * cm, 3.0 * cm],
+    )
+    metricas.setStyle(
+        TableStyle(
+            [
+                ("GRID", (0, 0), (-1, -1), 0.35, borde),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f7faf6")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ]
+        )
+    )
+    historia.extend([tarjeta_prioridad, Spacer(1, 5), metricas, Spacer(1, 3)])
 
     secciones = [
         (
             "RESULTADO GENERAL",
-            f"<b>PRIORIDAD {r['prioridad'].upper()} DE REVISIÓN</b><br/><br/>"
             f"El área {descripcion_cobertura}. El análisis identificó {resultado_general}. "
-            "Este resultado no confirma por sí solo que haya ocurrido deforestación; "
-            "indica si existen sectores que deben revisarse con mayor detalle.",
+            "Este resultado no confirma por sí solo que haya ocurrido deforestación. "
+            "Su función es señalar sectores que requieren una revisión más detallada.",
         ),
         (
             "¿QUÉ SE ENCONTRÓ?",
-            f"<b>1. Estado actual de la cobertura</b><br/><br/>"
-            f"En {anio_esri_final} se identificaron {r['esri_arboles_final']:.1f} ha "
-            f"con cobertura de árboles, aproximadamente {pct_arbol:.1f}% del área.<br/><br/>"
-            f"<b>2. Cambios que requieren atención</b><br/><br/>"
-            f"Se identificaron {r['esri_salida']:.1f} ha donde la clase árboles pasó "
-            f"a otra cobertura entre {anio_esri_inicial} y {anio_esri_final} "
-            f"({r['pct_esri_salida']:.1f}% del área). En dirección opuesta, "
+            f"<b>1. Estado actual de la cobertura.</b> En {anio_esri_final} se identificaron "
+            f"{r['esri_arboles_final']:.1f} ha con cobertura clasificada como árboles, "
+            f"aproximadamente {pct_arbol:.1f}% del área.<br/><br/>"
+            f"<b>2. Cambios que requieren atención.</b> Entre {anio_esri_inicial} y "
+            f"{anio_esri_final}, {r['esri_salida']:.1f} ha pasaron de árboles a otra "
+            f"cobertura ({r['pct_esri_salida']:.1f}% del área), mientras "
             f"{r['esri_ganancia']:.1f} ha pasaron a árboles ({pct_ganancia:.1f}%). "
-            f"Hansen registró {r['hansen_post']:.2f} ha de pérdida después del {CUTOFF_LABEL}.<br/><br/>"
-            f"{coincidencia}<br/><br/>"
-            f"<b>3. Condición del bosque y la vegetación</b><br/><br/>"
-            f"JRC TMF {anio_tmf}: {r['tmf_estable']:.1f} ha de bosque estable, "
-            f"{r['tmf_degradacion']:.1f} ha de degradación, "
-            f"{r['tmf_deforestacion']:.1f} ha de deforestación y "
-            f"{r['tmf_recuperacion']:.1f} ha de recuperación.<br/><br/>{texto_dosel}",
+            f"Hansen registró {r['hansen_post']:.2f} ha de pérdida después del "
+            f"{CUTOFF_LABEL}. {coincidencia}<br/><br/>"
+            f"<b>3. Condición del bosque y la vegetación.</b> JRC TMF {anio_tmf} registró "
+            f"{r['tmf_estable']:.1f} ha de bosque estable, {r['tmf_degradacion']:.1f} ha "
+            f"de degradación, {r['tmf_deforestacion']:.1f} ha de deforestación y "
+            f"{r['tmf_recuperacion']:.1f} ha de recuperación. {texto_dosel}",
         ),
         (
             "¿QUÉ SIGNIFICAN ESTOS RESULTADOS?",
             "Las imágenes satelitales permiten reconocer dónde pudo ocurrir un cambio, "
-            "pero no establecen automáticamente su causa. Puede corresponder a manejo "
-            "productivo, cosecha de plantaciones, limpieza, regeneración, nubosidad "
-            "residual o una modificación real de la cobertura forestal.",
+            "pero no establecen automáticamente su causa. El patrón observado puede "
+            "corresponder a manejo productivo, cosecha de plantaciones, regeneración, "
+            "nubosidad residual o una modificación real de la cobertura forestal.",
         ),
         (
             "¿DÓNDE SE DEBE REVISAR?",
-            "Los sectores resaltados en los mapas temáticos constituyen la referencia "
-            "visual para orientar una revisión. Deben contrastarse con imágenes recientes "
-            "e información del predio.",
+            "Los sectores resaltados en los mapas temáticos son una referencia visual para "
+            "orientar la revisión. Deben contrastarse con imágenes recientes, registros de "
+            "manejo, información del predio y verificación de campo cuando corresponda.",
         ),
         ("ACCIÓN RECOMENDADA", texto_recomendacion(r["prioridad"])),
         (
             "CONCLUSIÓN DE LA PREEVALUACIÓN",
-            f"El área presenta prioridad {r['prioridad'].lower()} de revisión, con un "
-            f"índice operativo de {r['puntaje']:.1f}/6.0. La decisión final debe "
-            "complementarse con información del productor, documentación del predio, "
-            "imágenes recientes y verificación de campo cuando corresponda.",
-        ),
-        (
-            "INFORMACIÓN TÉCNICA DE RESPALDO",
-            "La preevaluación integró JRC Tropical Moist Forest, Hansen Global Forest "
-            "Change, ESRI Land Use/Land Cover y altura del dosel basada en GEDI. "
-            "Los umbrales son operativos para priorización y no constituyen definiciones legales.<br/><br/>"
-            "Los resultados corresponden a una preevaluación territorial. No constituyen "
-            "una certificación, una determinación legal ni una confirmación definitiva "
-            "de deforestación o de cumplimiento EUDR.",
+            f"El área presenta prioridad {r['prioridad'].lower()} de revisión. La decisión "
+            "final debe complementarse con información del productor, documentación del "
+            "predio, imágenes recientes y verificación de campo cuando corresponda.",
         ),
     ]
     for titulo, cuerpo in secciones:
         historia.append(Paragraph(titulo, estilos["SeccionFicha"]))
         historia.append(Paragraph(cuerpo, estilos["CuerpoFicha"]))
 
-    historia.extend(
-        [
-            PageBreak(),
-            Paragraph("DIAGNÓSTICO POR FUENTE", estilos["SeccionFicha"]),
-        ]
+    historia.extend([PageBreak(), Paragraph("MAPAS TEMÁTICOS DEL ÁREA EVALUADA", estilos["TituloFicha"])])
+    celdas = []
+    for mapa in mapas or []:
+        contenido = [Paragraph(mapa["titulo"], estilos["MapaTitulo"])]
+        if mapa.get("imagen"):
+            imagen = ReportLabImage(BytesIO(mapa["imagen"]))
+            escala = min((7.65 * cm) / imagen.imageWidth, (4.85 * cm) / imagen.imageHeight)
+            imagen.drawWidth = imagen.imageWidth * escala
+            imagen.drawHeight = imagen.imageHeight * escala
+            contenido.extend([imagen, Spacer(1, 2)])
+        else:
+            contenido.append(
+                Table(
+                    [[Paragraph("Imagen no disponible. Consulte el mapa interactivo.", estilos["MapaNota"])]],
+                    colWidths=[7.4 * cm],
+                    rowHeights=[4.6 * cm],
+                    style=TableStyle(
+                        [
+                            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#bdbdbd")),
+                            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f4f4f4")),
+                            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                        ]
+                    ),
+                )
+            )
+        contenido.append(Paragraph(mapa["leyenda"], estilos["MapaNota"]))
+        celdas.append(contenido)
+    if celdas:
+        filas_mapas = [celdas[i : i + 2] for i in range(0, len(celdas), 2)]
+        if len(filas_mapas[-1]) == 1:
+            filas_mapas[-1].append("")
+        tabla_mapas = Table(filas_mapas, colWidths=[8.15 * cm, 8.15 * cm])
+        tabla_mapas.setStyle(
+            TableStyle(
+                [
+                    ("BOX", (0, 0), (-1, -1), 0.45, borde),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#c8d6c4")),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ]
+            )
+        )
+        historia.append(tabla_mapas)
+    historia.append(
+        Paragraph(
+            "Nota cartográfica: el contorno celeste identifica el área evaluada. Las imágenes "
+            "se generan automáticamente a partir de las fuentes indicadas y deben interpretarse "
+            "junto con las leyendas y las limitaciones metodológicas.",
+            estilos["CuerpoFicha"],
+        )
     )
+
+    historia.extend([PageBreak(), Paragraph("DIAGNÓSTICO POR FUENTE", estilos["TituloFicha"])])
     filas_fuentes = [
-        ["Fuente", "Resultado", "Señal"],
-        [
-            f"JRC TMF {anio_tmf}",
-            f"Deforestación {r['tmf_deforestacion']:.1f} ha; degradación {r['tmf_degradacion']:.1f} ha",
-            "Sí" if r["senal_tmf"] else "No",
-        ],
-        [
-            f"ESRI {anio_esri_inicial}-{anio_esri_final}",
-            f"Salida de árboles {r['esri_salida']:.1f} ha",
-            "Sí" if r["senal_esri"] else "No",
-        ],
-        [
-            "Hansen GFC",
-            f"Pérdida post-{CUTOFF_LABEL}: {r['hansen_post']:.2f} ha",
-            "Sí" if r["senal_hansen"] else "No",
-        ],
-        [
-            "GEDI",
-            (
-                f"Dosel {r['gedi_altura']:.1f} m; cobertura válida {r['gedi_cobertura_pct']:.0f}%"
-                if r["gedi_disponible"]
-                else "Datos insuficientes"
-            ),
-            "Contexto" if r["senal_gedi"] else "No",
-        ],
-        ["Cambio NDVI Sentinel-2", "Capa de apoyo visual; no participa en el índice", "No"],
+        ["Fuente", "Resultado específico", "Señal"],
+        [f"JRC TMF {anio_tmf}", f"Deforestación {r['tmf_deforestacion']:.1f} ha; degradación {r['tmf_degradacion']:.1f} ha", "Sí" if r["senal_tmf"] else "No"],
+        [f"ESRI {anio_esri_inicial}-{anio_esri_final}", f"Salida de árboles {r['esri_salida']:.1f} ha ({r['pct_esri_salida']:.1f}%)", "Sí" if r["senal_esri"] else "No"],
+        ["Hansen GFC", f"Pérdida posterior al {CUTOFF_LABEL}: {r['hansen_post']:.2f} ha", "Sí" if r["senal_hansen"] else "No"],
+        ["GEDI", f"Dosel {r['gedi_altura']:.1f} m; área con datos válidos {r['gedi_cobertura_pct']:.0f}%" if r["gedi_disponible"] else "Datos insuficientes", "Contexto" if r["senal_gedi"] else "No"],
+        [f"NDVI {anio_ndvi_inicial}-{ANO_NDVI_MAX}", "Apoyo visual; no participa en el índice operativo", "No aplica"],
     ]
-    tabla_fuentes = Table(filas_fuentes, colWidths=[4.0 * cm, 9.8 * cm, 2.2 * cm], repeatRows=1)
+    filas_fuentes = [
+        [
+            Paragraph(str(c), estilos["CabeceraTabla"] if i == 0 else estilos["CuerpoFicha"])
+            for c in fila
+        ]
+        for i, fila in enumerate(filas_fuentes)
+    ]
+    tabla_fuentes = Table(filas_fuentes, colWidths=[4.0 * cm, 9.8 * cm, 2.4 * cm], repeatRows=1)
     tabla_fuentes.setStyle(
         TableStyle(
             [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#244d23")),
+                ("BACKGROUND", (0, 0), (-1, 0), verde),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+                ("FONTNAME", (0, 0), (-1, 0), "Times-Bold"),
+                ("FONTNAME", (0, 1), (-1, -1), "Times-Roman"),
                 ("FONTSIZE", (0, 0), (-1, -1), 8.5),
-                ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#8aa684")),
+                ("GRID", (0, 0), (-1, -1), 0.4, borde),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f4f7f2")]),
                 ("LEFTPADDING", (0, 0), (-1, -1), 5),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 5),
-                ("TOPPADDING", (0, 0), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
             ]
         )
     )
     historia.extend(
         [
             tabla_fuentes,
-            Spacer(1, 12),
+            Paragraph("INFORMACIÓN TÉCNICA DE RESPALDO", estilos["SeccionFicha"]),
             Paragraph(
-                "Pesos preliminares de criterio experto: JRC TMF 2.0, Hansen 2.0, "
-                "ESRI 1.5 y GEDI 0.5. El índice no es una probabilidad ni una conclusión legal.",
+                "La preevaluación integró JRC Tropical Moist Forest, Hansen Global Forest "
+                "Change, ESRI Land Use/Land Cover, altura del dosel basada en GEDI y NDVI "
+                "derivado de Sentinel-2. Los cálculos se realizan por fuente en su resolución "
+                "de trabajo; no se interpretan como coincidencias píxel a píxel.",
+                estilos["CuerpoFicha"],
+            ),
+            Paragraph(
+                "Los pesos del índice son criterios operativos preliminares: JRC TMF 2.0, "
+                "Hansen 2.0, ESRI 1.5 y GEDI 0.5. El índice no representa una probabilidad, "
+                "una certificación, una determinación legal ni una confirmación definitiva "
+                "de deforestación o de cumplimiento EUDR.",
                 estilos["CuerpoFicha"],
             ),
         ]
     )
-    documento.build(historia)
+
+    def pie_pagina(canvas_pdf, documento_pdf):
+        canvas_pdf.saveState()
+        ancho, _ = A4
+        canvas_pdf.setStrokeColor(colors.HexColor("#9aab96"))
+        canvas_pdf.setLineWidth(0.4)
+        canvas_pdf.line(1.55 * cm, 1.2 * cm, ancho - 1.55 * cm, 1.2 * cm)
+        canvas_pdf.setFont("Times-Roman", 7.5)
+        canvas_pdf.setFillColor(colors.HexColor("#555555"))
+        canvas_pdf.drawString(1.55 * cm, 0.82 * cm, "Preevaluación territorial indicativa - requiere verificación")
+        canvas_pdf.drawRightString(ancho - 1.55 * cm, 0.82 * cm, f"Página {documento_pdf.page}")
+        canvas_pdf.restoreState()
+
+    documento.build(historia, onFirstPage=pie_pagina, onLaterPages=pie_pagina)
     memoria.seek(0)
     return memoria.getvalue()
 
@@ -848,12 +1274,20 @@ def mostrar_resultados(resultados, anio_tmf, anio_esri_inicial, anio_esri_final)
         """,
         unsafe_allow_html=True,
     )
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Bosque estable JRC", f"{resultados['tmf_estable']:.1f} ha")
-    c2.metric("Degradación JRC", f"{resultados['tmf_degradacion']:.1f} ha")
-    c3.metric("Deforestación JRC", f"{resultados['tmf_deforestacion']:.1f} ha")
-    c4.metric("Recuperación JRC", f"{resultados['tmf_recuperacion']:.1f} ha")
+    area = resultados["area_ha"]
+    pct_arboles = resultados["esri_arboles_final"] / area * 100 if area else 0
+    resumen, detalle = st.tabs(["Lectura sencilla", "Detalle técnico por fuente"])
+    with resumen:
+        st.markdown(
+            "**¿Qué significa?** La prioridad sirve para decidir dónde conviene revisar "
+            "imágenes, documentos o realizar una visita. No demuestra por sí sola la causa del cambio."
+        )
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Cobertura de árboles", f"{resultados['esri_arboles_final']:.1f} ha", f"{pct_arboles:.1f}% del área", delta_color="off")
+        c2.metric("Árboles que cambiaron", f"{resultados['esri_salida']:.1f} ha", f"{resultados['pct_esri_salida']:.1f}% del área", delta_color="off")
+        c3.metric("Pérdida posterior a 2020", f"{resultados['hansen_post']:.2f} ha")
+        c4.metric("Deforestación señalada por JRC", f"{resultados['tmf_deforestacion']:.1f} ha")
+        st.markdown(f"**Siguiente paso recomendado:** {texto_recomendacion(prioridad)}")
 
     filas = [
         (
@@ -889,83 +1323,115 @@ def mostrar_resultados(resultados, anio_tmf, anio_esri_inicial, anio_esri_final)
             False,
         ),
     ]
-    for titulo, detalle, alerta in filas:
-        icono = "⚠" if alerta else "✓"
-        color_texto = "#c62828" if alerta else "#2e7d32"
-        st.markdown(
-            f'<div class="resultado-fuente"><b style="color:{color_texto};">'
-            f"{icono} {titulo}</b><br/>{detalle}</div>",
-            unsafe_allow_html=True,
-        )
+    with detalle:
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Bosque estable JRC", f"{resultados['tmf_estable']:.1f} ha")
+        c2.metric("Degradación JRC", f"{resultados['tmf_degradacion']:.1f} ha")
+        c3.metric("Deforestación JRC", f"{resultados['tmf_deforestacion']:.1f} ha")
+        c4.metric("Recuperación JRC", f"{resultados['tmf_recuperacion']:.1f} ha")
+        for titulo, texto_detalle, alerta in filas:
+            icono = "⚠" if alerta else "✓"
+            color_texto = "#c62828" if alerta else "#2e7d32"
+            st.markdown(
+                f'<div class="resultado-fuente"><b style="color:{color_texto};">'
+                f"{icono} {titulo}</b><br/>{texto_detalle}</div>",
+                unsafe_allow_html=True,
+            )
+        st.caption("Use el menú de cada gráfico para guardarlo como imagen o descargar sus datos.")
+        grafico_jrc, grafico_esri = st.columns(2)
+        with grafico_jrc:
+            st.markdown("**Distribución del estado forestal JRC**")
+            st.bar_chart(
+                {
+                    "Clase": ["Bosque estable", "Degradación", "Deforestación", "Recuperación"],
+                    "Hectáreas": [
+                        resultados["tmf_estable"],
+                        resultados["tmf_degradacion"],
+                        resultados["tmf_deforestacion"],
+                        resultados["tmf_recuperacion"],
+                    ],
+                },
+                x="Clase",
+                y="Hectáreas",
+                height=280,
+            )
+        with grafico_esri:
+            st.markdown("**Cambios de la clase árboles ESRI**")
+            st.bar_chart(
+                {
+                    "Clase": ["Árboles estables", "Salida de árboles", "Ganancia de árboles"],
+                    "Hectáreas": [
+                        resultados["esri_estable"],
+                        resultados["esri_salida"],
+                        resultados["esri_ganancia"],
+                    ],
+                },
+                x="Clase",
+                y="Hectáreas",
+                height=280,
+            )
 
 
 # -----------------------------------------------------------------------------
 # Aplicación
 # -----------------------------------------------------------------------------
 
-st.title("Visor de preevaluación territorial")
-st.info(
-    "Prototipo para identificar señales y priorizar revisiones. "
-    "No determina cumplimiento EUDR."
+st.markdown(
+    """
+    <div class="cabecera-app">
+      <h1>Visor de preevaluación territorial</h1>
+      <p>Herramienta de apoyo para identificar señales territoriales y orientar revisiones.
+      Los resultados son indicativos: no sustituyen la verificación de campo ni determinan
+      cumplimiento del Reglamento EUDR.</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
+
+with st.expander("Cómo utilizar el visor", expanded=False):
+    st.markdown(
+        """
+        1. **Seleccione una finca** en la barra lateral.
+        2. **Elija qué desea revisar**; la opción recomendada configura las capas automáticamente.
+        3. Pulse **Ejecutar preevaluación** y espere los resultados.
+        4. Revise los mapas y descargue la ficha PDF con el diagnóstico y las imágenes.
+
+        Los ajustes técnicos son opcionales y están disponibles en **Configuración avanzada**.
+        """
+    )
 
 try:
     iniciar_earth_engine()
 
-    st.sidebar.header("Área de análisis")
+    st.sidebar.markdown("## 1. Área que desea evaluar")
     tipo_area = st.sidebar.radio(
-        "Seleccione el área:",
-        ["Toda la cuenca", "Finca de monitoreo"],
+        "Seleccione una opción:",
+        ["Finca de monitoreo", "Toda la cuenca"],
+        help="Se recomienda iniciar con una finca. El análisis de toda la cuenca puede tardar varios minutos.",
     )
     finca_seleccionada = None
     if tipo_area == "Finca de monitoreo":
         finca_seleccionada = st.sidebar.selectbox(
-            "Seleccione la finca:",
+            "Finca:",
             obtener_ids_fincas(),
             format_func=str,
+            help="Las fincas están ordenadas de forma natural: 1, 2, 3...",
         )
-        nombre_area = f"Finca {finca_seleccionada}"
-    else:
-        nombre_area = "Cuenca hidrográfica de interés"
+    nombre_area = nombre_area_legible(tipo_area, finca_seleccionada)
 
     area_seleccionada = obtener_area(tipo_area, finca_seleccionada)
     geometria = area_seleccionada.geometry()
     superficie_ha = float(geometria.area(1).divide(10000).getInfo())
 
-    st.sidebar.header("Comparador temporal")
-    modo_comparador = st.sidebar.selectbox(
-        "Fuente del barrido:",
-        ["JRC TMF", "ESRI LULC", "Sin comparador"],
+    st.sidebar.markdown("## 2. ¿Qué desea revisar?")
+    objetivo = st.sidebar.selectbox(
+        "Tipo de revisión:",
+        list(PERFILES_VISUALIZACION),
+        help="Cada opción activa automáticamente las capas más útiles para ese objetivo.",
     )
-    if modo_comparador == "JRC TMF":
-        anio_tmf_inicial = st.sidebar.selectbox(
-            "Año inicial JRC:",
-            list(range(1990, ANO_TMF_MAX)),
-            index=list(range(1990, ANO_TMF_MAX)).index(2020),
-        )
-        anio_tmf_final = st.sidebar.selectbox(
-            "Año final JRC:",
-            list(range(1991, ANO_TMF_MAX + 1)),
-            index=len(list(range(1991, ANO_TMF_MAX + 1))) - 1,
-        )
-    else:
-        anio_tmf_inicial, anio_tmf_final = 2020, ANO_TMF_MAX
+    perfil = PERFILES_VISUALIZACION[objetivo]
+    st.sidebar.caption(perfil["descripcion"])
 
-    if modo_comparador == "ESRI LULC":
-        anio_esri_inicial = st.sidebar.selectbox(
-            "Año inicial ESRI:",
-            list(range(ANO_ESRI_MIN, ANO_ESRI_MAX)),
-            index=0,
-        )
-        anio_esri_final = st.sidebar.selectbox(
-            "Año final ESRI:",
-            list(range(ANO_ESRI_MIN + 1, ANO_ESRI_MAX + 1)),
-            index=len(list(range(ANO_ESRI_MIN + 1, ANO_ESRI_MAX + 1))) - 1,
-        )
-    else:
-        anio_esri_inicial, anio_esri_final = ANO_ESRI_MIN, ANO_ESRI_MAX
-
-    st.sidebar.header("Mapas temáticos")
     opciones_capas = [
         "Pérdida Hansen post-2020",
         "Pérdida Hansen 2001-2020",
@@ -978,24 +1444,96 @@ try:
         "ΔNDVI",
         "Vegetación NDVI",
     ]
-    capas_activas = st.sidebar.multiselect(
-        "Seleccione las capas que desea cargar:",
-        opciones_capas,
-        default=["Pérdida Hansen post-2020"],
-        help="Solo las capas seleccionadas se solicitan a Earth Engine para mantener el visor rápido.",
-    )
-    anio_ndvi_inicial = st.sidebar.selectbox(
-        "Año inicial para ΔNDVI:",
-        list(range(2017, ANO_NDVI_MAX)),
-        index=list(range(2017, ANO_NDVI_MAX)).index(2022),
-        disabled="ΔNDVI" not in capas_activas,
-    )
+    nombres_capas = {
+        "Pérdida Hansen post-2020": "Pérdida de árboles posterior a 2020",
+        "Pérdida Hansen 2001-2020": "Pérdida histórica de árboles (2001-2020)",
+        "Cobertura arbórea persistente": "Cobertura arbórea persistente hasta 2020",
+        "Deforestación JRC": "Señales de deforestación (JRC)",
+        "Degradación JRC": "Señales de degradación (JRC)",
+        "Uso y cobertura ESRI": "Uso y cobertura del suelo (ESRI)",
+        "Transiciones ESRI": "Cambios de la clase árboles (ESRI)",
+        "Altura GEDI": "Altura del dosel (GEDI)",
+        "ΔNDVI": "Cambio del vigor vegetal (ΔNDVI)",
+        "Vegetación NDVI": f"Vigor vegetal en {ANO_NDVI_MAX} (NDVI)",
+    }
+
+    modo_comparador = perfil["comparador"]
+    capas_activas = list(perfil["capas"])
+    anio_tmf_inicial, anio_tmf_final = 2020, ANO_TMF_MAX
+    anio_esri_inicial, anio_esri_final = ANO_ESRI_MIN, ANO_ESRI_MAX
+    anio_ndvi_inicial = 2022
+
+    with st.sidebar.expander("Configuración avanzada (opcional)", expanded=False):
+        personalizar = st.checkbox(
+            "Elegir manualmente mapas y períodos",
+            value=objetivo == "Exploración personalizada",
+        )
+        if personalizar:
+            modo_comparador = st.selectbox(
+                "Comparación principal:",
+                ["JRC TMF", "ESRI LULC", "Sin comparador"],
+                index=["JRC TMF", "ESRI LULC", "Sin comparador"].index(modo_comparador),
+                help="JRC compara el estado del bosque; ESRI compara el uso y la cobertura del suelo.",
+            )
+            if modo_comparador == "JRC TMF":
+                anio_tmf_inicial = st.selectbox(
+                    "Año inicial del bosque:",
+                    list(range(1990, ANO_TMF_MAX)),
+                    index=list(range(1990, ANO_TMF_MAX)).index(2020),
+                )
+                anio_tmf_final = st.selectbox(
+                    "Año final del bosque:",
+                    list(range(anio_tmf_inicial + 1, ANO_TMF_MAX + 1)),
+                    index=len(list(range(anio_tmf_inicial + 1, ANO_TMF_MAX + 1))) - 1,
+                )
+            if modo_comparador == "ESRI LULC":
+                anio_esri_inicial = st.selectbox(
+                    "Año inicial del uso del suelo:",
+                    list(range(ANO_ESRI_MIN, ANO_ESRI_MAX)),
+                )
+                anio_esri_final = st.selectbox(
+                    "Año final del uso del suelo:",
+                    list(range(anio_esri_inicial + 1, ANO_ESRI_MAX + 1)),
+                    index=len(list(range(anio_esri_inicial + 1, ANO_ESRI_MAX + 1))) - 1,
+                )
+            capas_activas = st.multiselect(
+                "Mapas adicionales:",
+                opciones_capas,
+                default=capas_activas,
+                format_func=lambda valor: nombres_capas[valor],
+                help="Seleccione solo los mapas que realmente necesita para mantener el visor ágil.",
+            )
+            anio_ndvi_inicial = st.selectbox(
+                "Año inicial del cambio vegetal:",
+                list(range(2017, ANO_NDVI_MAX)),
+                index=list(range(2017, ANO_NDVI_MAX)).index(2022),
+                disabled="ΔNDVI" not in capas_activas,
+            )
+        else:
+            st.caption(
+                f"Períodos recomendados: JRC 2020-{ANO_TMF_MAX}, "
+                f"ESRI {ANO_ESRI_MIN}-{ANO_ESRI_MAX} y NDVI 2022-{ANO_NDVI_MAX}."
+            )
 
     columna_area, columna_superficie = st.columns(2)
     columna_area.metric("Área seleccionada", nombre_area)
     columna_superficie.metric("Superficie aproximada", f"{superficie_ha:,.1f} ha")
 
-    with st.expander("Diferencia entre ΔNDVI y vegetación 2025", expanded=False):
+    if tipo_area == "Toda la cuenca":
+        st.warning(
+            "El análisis regional puede tardar varios minutos. Para una revisión rápida y "
+            "más detallada se recomienda seleccionar una finca."
+        )
+
+    st.markdown(
+        f"""
+        <div class="paso-guia"><b>Configuración lista.</b> Está revisando <b>{nombre_area}</b>
+        con el perfil <b>{objetivo}</b>. Pulse el botón de análisis antes de interpretar los mapas.</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    with st.expander("¿Qué diferencia hay entre cambio vegetal y vigor vegetal?", expanded=False):
         st.markdown(
             f"""
             - **ΔNDVI {anio_ndvi_inicial} → {ANO_NDVI_MAX}:** muestra cuánto cambió el vigor
@@ -1007,6 +1545,82 @@ try:
             GEDI aporta el componente estructural —altura del dosel— que NDVI no puede determinar.
             """
         )
+
+    st.subheader("3. Ejecute la preevaluación")
+    st.caption(
+        "El visor calculará las señales y preparará automáticamente la ficha PDF con "
+        "seis mapas temáticos. El proceso puede tardar un momento."
+    )
+    firma_actual = (
+        tipo_area,
+        finca_seleccionada,
+        anio_tmf_final,
+        anio_esri_inicial,
+        anio_esri_final,
+        anio_ndvi_inicial,
+    )
+    if st.button(
+        "Ejecutar preevaluación",
+        type="primary",
+        use_container_width=True,
+        help="Calcula los resultados y prepara el informe descargable.",
+    ):
+        with st.spinner("Calculando señales y preparando el informe cartográfico..."):
+            resultados_nuevos = ejecutar_analisis(
+                tipo_area,
+                finca_seleccionada,
+                anio_tmf_final,
+                anio_esri_inicial,
+                anio_esri_final,
+            )
+            mapas_reporte = generar_mapas_reporte(
+                tipo_area,
+                finca_seleccionada,
+                anio_tmf_final,
+                anio_esri_inicial,
+                anio_esri_final,
+                anio_ndvi_inicial,
+            )
+            pdf_nuevo = generar_pdf(
+                nombre_area,
+                resultados_nuevos,
+                anio_tmf_final,
+                anio_esri_inicial,
+                anio_esri_final,
+                anio_ndvi_inicial,
+                mapas_reporte,
+            )
+            st.session_state["resultados_analisis"] = resultados_nuevos
+            st.session_state["pdf_analisis"] = pdf_nuevo
+            st.session_state["firma_analisis"] = firma_actual
+
+    if st.session_state.get("firma_analisis") == firma_actual:
+        resultados = st.session_state["resultados_analisis"]
+        mostrar_resultados(
+            resultados,
+            anio_tmf_final,
+            anio_esri_inicial,
+            anio_esri_final,
+        )
+        nombre_archivo = re.sub(r"[^A-Za-z0-9_-]+", "_", nombre_area).strip("_").lower()
+        st.download_button(
+            "Descargar informe PDF con mapas",
+            data=st.session_state["pdf_analisis"],
+            file_name=f"ficha_preevaluacion_{nombre_archivo}.pdf",
+            mime="application/pdf",
+            type="primary",
+            use_container_width=True,
+        )
+    elif "resultados_analisis" in st.session_state:
+        st.warning(
+            "Cambió el área o el período. Ejecute nuevamente la preevaluación para "
+            "actualizar los resultados y el informe."
+        )
+    else:
+        st.info("Los resultados aparecerán aquí después de ejecutar la preevaluación.")
+
+    st.divider()
+    st.subheader("4. Explore los mapas")
 
     mapa = folium.Map(
         location=[8.7, -80.0],
@@ -1167,10 +1781,10 @@ try:
     mapa.fit_bounds(obtener_limites(area_seleccionada))
     folium.LayerControl(collapsed=True).add_to(mapa)
 
-    st.subheader("Mapa del área evaluada")
+    st.markdown("#### Mapa interactivo del área evaluada")
     st.caption(
-        "Mueva el divisor para comparar los años. Las capas temáticas pueden activarse "
-        "o desactivarse desde el control del mapa."
+        "Si aparece un divisor vertical, muévalo para comparar dos años. Use el botón "
+        "de capas ubicado dentro del mapa para mostrar u ocultar información."
     )
     st_folium(
         mapa,
@@ -1184,78 +1798,36 @@ try:
         ),
     )
 
-    st.subheader("Leyenda activa")
-    columnas_leyenda = st.columns(2)
-    leyendas_activas = []
-    if modo_comparador in ("JRC TMF", "ESRI LULC"):
-        leyendas_activas.append((modo_comparador, LEYENDAS[modo_comparador]))
-    for nombre in capas_activas:
-        if nombre in LEYENDAS:
-            leyendas_activas.append((nombre, LEYENDAS[nombre]))
-        elif nombre == "Uso y cobertura ESRI":
-            leyendas_activas.append((nombre, LEYENDAS["ESRI LULC"]))
-    for indice, (titulo, elementos) in enumerate(leyendas_activas):
-        with columnas_leyenda[indice % 2]:
-            mostrar_leyenda(titulo, elementos)
+    with st.expander("Ver leyendas de colores", expanded=True):
+        columnas_leyenda = st.columns(2)
+        leyendas_activas = []
+        if modo_comparador in ("JRC TMF", "ESRI LULC"):
+            leyendas_activas.append((modo_comparador, LEYENDAS[modo_comparador]))
+        for nombre in capas_activas:
+            if nombre in LEYENDAS:
+                leyendas_activas.append((nombres_capas.get(nombre, nombre), LEYENDAS[nombre]))
+            elif nombre == "Uso y cobertura ESRI":
+                leyendas_activas.append((nombres_capas[nombre], LEYENDAS["ESRI LULC"]))
+        for indice, (titulo, elementos) in enumerate(leyendas_activas):
+            with columnas_leyenda[indice % 2]:
+                mostrar_leyenda(titulo, elementos)
 
-    st.divider()
-    st.subheader("Preevaluación integrada")
-    st.caption(
-        "El análisis se ejecuta únicamente al presionar el botón. Esto evita recalcular "
-        "toda la cuenca cada vez que se cambia una capa del mapa."
-    )
-    if st.button("Ejecutar análisis", type="primary"):
-        with st.spinner("Calculando señales territoriales en Earth Engine…"):
-            st.session_state["resultados_analisis"] = ejecutar_analisis(
-                tipo_area,
-                finca_seleccionada,
-                anio_tmf_final,
-                anio_esri_inicial,
-                anio_esri_final,
-            )
-            st.session_state["firma_analisis"] = (
-                tipo_area,
-                finca_seleccionada,
-                anio_tmf_final,
-                anio_esri_inicial,
-                anio_esri_final,
-            )
+    with st.expander("Fuentes utilizadas y alcance de la herramienta", expanded=False):
+        st.markdown(
+            """
+            - **JRC Tropical Moist Forest:** estado anual del bosque tropical húmedo.
+            - **Hansen Global Forest Change:** alertas anuales de pérdida de cobertura arbórea.
+            - **ESRI Land Use/Land Cover:** clases de uso y cobertura del suelo a 10 m.
+            - **GEDI / OpenForis:** altura estimada del dosel y disponibilidad de datos.
+            - **Sentinel-2 NDVI:** vigor vegetal y su cambio entre dos períodos.
 
-    firma_actual = (
-        tipo_area,
-        finca_seleccionada,
-        anio_tmf_final,
-        anio_esri_inicial,
-        anio_esri_final,
-    )
-    if st.session_state.get("firma_analisis") == firma_actual:
-        resultados = st.session_state["resultados_analisis"]
-        mostrar_resultados(
-            resultados,
-            anio_tmf_final,
-            anio_esri_inicial,
-            anio_esri_final,
-        )
-        pdf = generar_pdf(
-            nombre_area,
-            resultados,
-            anio_tmf_final,
-            anio_esri_inicial,
-            anio_esri_final,
-        )
-        nombre_archivo = re.sub(r"[^A-Za-z0-9_-]+", "_", nombre_area).strip("_").lower()
-        st.download_button(
-            "Descargar ficha PDF",
-            data=pdf,
-            file_name=f"ficha_preevaluacion_{nombre_archivo}.pdf",
-            mime="application/pdf",
-            type="primary",
-        )
-    elif "resultados_analisis" in st.session_state:
-        st.warning(
-            "Cambió el área o el período. Presione “Ejecutar análisis” para actualizar los resultados."
+            Las fuentes tienen resoluciones, fechas y metodologías diferentes. El visor integra
+            señales por área para priorizar revisiones; no compara píxeles exactos entre productos
+            y no constituye una certificación ni una determinación legal.
+            """
         )
 
 except Exception as error:
     st.error("No fue posible cargar el visor territorial.")
-    st.exception(error)
+    with st.expander("Detalle técnico para soporte", expanded=False):
+        st.code(f"{type(error).__name__}: {error}")
