@@ -81,6 +81,18 @@ st.markdown(
         border-radius: .45rem;
         margin-bottom: .45rem;
     }
+    .comparador-anios {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: .65rem .85rem;
+        margin: .25rem 0 .55rem;
+        border: 1px solid rgba(23,53,31,.28);
+        border-radius: .55rem;
+        background: #f4f8f2;
+        color: #17351f;
+    }
+    .comparador-anios span:last-child {text-align: right;}
     </style>
     """,
     unsafe_allow_html=True,
@@ -91,7 +103,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "1.2.1"
+APP_VERSION = "1.2.2"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
 ASSET_CUENCA = (
@@ -547,6 +559,44 @@ def capa_gee(mapa, imagen, visualizacion, nombre, mostrar=True, opacidad=1.0, co
     )
     capa.add_to(mapa)
     return capa
+
+
+def agregar_rotulos_comparador(mapa, limites, etiqueta_inicial, etiqueta_final):
+    (sur, oeste), (norte, este) = limites
+    margen_latitud = (norte - sur) * 0.045
+    margen_longitud = (este - oeste) * 0.035
+    latitud = norte - margen_latitud
+    estilo = (
+        "background:rgba(17,50,74,.92);color:white;padding:7px 10px;"
+        "border:2px solid white;border-radius:6px;box-shadow:0 2px 7px rgba(0,0,0,.35);"
+        "font:12px Arial,sans-serif;line-height:1.25;white-space:nowrap;"
+    )
+    folium.Marker(
+        location=[latitud, oeste + margen_longitud],
+        icon=folium.DivIcon(
+            class_name="rotulo-comparador-mapa",
+            icon_size=(185, 48),
+            icon_anchor=(0, 0),
+            html=(
+                f'<div style="{estilo}"><span style="font-size:10px;">◀ AÑO INICIAL</span>'
+                f'<br><b>{etiqueta_inicial}</b></div>'
+            ),
+        ),
+        z_index_offset=1000,
+    ).add_to(mapa)
+    folium.Marker(
+        location=[latitud, este - margen_longitud],
+        icon=folium.DivIcon(
+            class_name="rotulo-comparador-mapa",
+            icon_size=(185, 48),
+            icon_anchor=(185, 0),
+            html=(
+                f'<div style="{estilo}text-align:right;"><span style="font-size:10px;">'
+                f'AÑO FINAL ▶</span><br><b>{etiqueta_final}</b></div>'
+            ),
+        ),
+        z_index_offset=1000,
+    ).add_to(mapa)
 
 
 # -----------------------------------------------------------------------------
@@ -1810,34 +1860,40 @@ try:
 
     capa_izquierda = None
     capa_derecha = None
+    etiqueta_inicial = None
+    etiqueta_final = None
     if modo_comparador == "JRC TMF":
+        etiqueta_inicial = f"JRC TMF {anio_tmf_inicial}"
+        etiqueta_final = f"JRC TMF {anio_tmf_final}"
         capa_izquierda = capa_gee(
             mapa,
             obtener_tmf(anio_tmf_inicial, geometria),
             VIS_TMF,
-            f"JRC TMF {anio_tmf_inicial}",
+            etiqueta_inicial,
             control=False,
         )
         capa_derecha = capa_gee(
             mapa,
             obtener_tmf(anio_tmf_final, geometria),
             VIS_TMF,
-            f"JRC TMF {anio_tmf_final}",
+            etiqueta_final,
             control=False,
         )
     elif modo_comparador == "ESRI LULC":
+        etiqueta_inicial = f"ESRI {anio_esri_inicial}"
+        etiqueta_final = f"ESRI {anio_esri_final}"
         capa_izquierda = capa_gee(
             mapa,
             obtener_esri_visual(anio_esri_inicial, geometria),
             VIS_ESRI,
-            f"ESRI {anio_esri_inicial}",
+            etiqueta_inicial,
             control=False,
         )
         capa_derecha = capa_gee(
             mapa,
             obtener_esri_visual(anio_esri_final, geometria),
             VIS_ESRI,
-            f"ESRI {anio_esri_final}",
+            etiqueta_final,
             control=False,
         )
     if capa_izquierda is not None and capa_derecha is not None:
@@ -1846,6 +1902,9 @@ try:
             layer_right=capa_derecha,
         ).add_to(mapa)
 
+    # Las capas auxiliares se mantienen disponibles en Layers, pero comienzan
+    # apagadas cuando existe un barrido para no cubrir los años comparados.
+    mostrar_capas_auxiliares = modo_comparador == "Sin comparador"
     perdida_post = perdida_pre = linea_base = None
     if any(
         nombre in capas_activas
@@ -1858,17 +1917,36 @@ try:
         perdida_post, perdida_pre, linea_base = imagenes_hansen(geometria)
 
     if "Pérdida Hansen post-2020" in capas_activas:
-        capa_gee(mapa, perdida_post, VIS_HANSEN_POST, f"Hansen 2021-{ANO_HANSEN_MAX}")
+        capa_gee(
+            mapa,
+            perdida_post,
+            VIS_HANSEN_POST,
+            f"Hansen 2021-{ANO_HANSEN_MAX}",
+            mostrar=mostrar_capas_auxiliares,
+        )
     if "Pérdida Hansen 2001-2020" in capas_activas:
-        capa_gee(mapa, perdida_pre, VIS_HANSEN_PRE, "Hansen 2001-2020")
+        capa_gee(
+            mapa,
+            perdida_pre,
+            VIS_HANSEN_PRE,
+            "Hansen 2001-2020",
+            mostrar=mostrar_capas_auxiliares,
+        )
     if "Cobertura arbórea persistente" in capas_activas:
-        capa_gee(mapa, linea_base, VIS_LINEA_BASE, "Cobertura arbórea persistente")
+        capa_gee(
+            mapa,
+            linea_base,
+            VIS_LINEA_BASE,
+            "Cobertura arbórea persistente",
+            mostrar=mostrar_capas_auxiliares,
+        )
     if "Deforestación JRC" in capas_activas:
         capa_gee(
             mapa,
             obtener_tmf(anio_tmf_final, geometria).eq(3).selfMask(),
             VIS_TMF_DEFOR,
             f"Deforestación JRC {anio_tmf_final}",
+            mostrar=mostrar_capas_auxiliares,
         )
     if "Degradación JRC" in capas_activas:
         capa_gee(
@@ -1876,6 +1954,7 @@ try:
             obtener_tmf(anio_tmf_final, geometria).eq(2).selfMask(),
             VIS_TMF_DEGRAD,
             f"Degradación JRC {anio_tmf_final}",
+            mostrar=mostrar_capas_auxiliares,
         )
     if "Uso y cobertura ESRI" in capas_activas:
         capa_gee(
@@ -1883,6 +1962,7 @@ try:
             obtener_esri_visual(anio_esri_final, geometria),
             VIS_ESRI,
             f"Uso y cobertura ESRI {anio_esri_final}",
+            mostrar=mostrar_capas_auxiliares,
         )
     if "Transiciones ESRI" in capas_activas:
         esri_i = obtener_esri(anio_esri_inicial, geometria)
@@ -1899,10 +1979,17 @@ try:
             transicion,
             VIS_ESRI_CAMBIO,
             f"Transiciones ESRI {anio_esri_inicial}-{anio_esri_final}",
+            mostrar=mostrar_capas_auxiliares,
         )
     if "Altura GEDI" in capas_activas:
         gedi = imagen_gedi(geometria)
-        capa_gee(mapa, gedi, VIS_GEDI, "Altura del dosel GEDI")
+        capa_gee(
+            mapa,
+            gedi,
+            VIS_GEDI,
+            "Altura del dosel GEDI",
+            mostrar=mostrar_capas_auxiliares,
+        )
     ndvi_final = None
     if "ΔNDVI" in capas_activas or "Vegetación NDVI" in capas_activas:
         ndvi_final = obtener_ndvi(ANO_NDVI_MAX, geometria)
@@ -1914,6 +2001,7 @@ try:
             delta_ndvi,
             VIS_NDVI_DELTA,
             f"ΔNDVI {anio_ndvi_inicial}-{ANO_NDVI_MAX}",
+            mostrar=mostrar_capas_auxiliares,
         )
     if "Vegetación NDVI" in capas_activas:
         capa_gee(
@@ -1921,6 +2009,7 @@ try:
             clasificar_ndvi(ndvi_final),
             VIS_NDVI_CLASES,
             f"Vegetación NDVI {ANO_NDVI_MAX}",
+            mostrar=mostrar_capas_auxiliares,
         )
 
     cuenca = ee.FeatureCollection(ASSET_CUENCA)
@@ -1944,21 +2033,44 @@ try:
         {},
         "Área seleccionada",
     )
-    mapa.fit_bounds(obtener_limites(area_seleccionada))
+    limites_area = obtener_limites(area_seleccionada)
+    if etiqueta_inicial and etiqueta_final:
+        agregar_rotulos_comparador(
+            mapa,
+            limites_area,
+            etiqueta_inicial,
+            etiqueta_final,
+        )
+    mapa.fit_bounds(limites_area)
     folium.LayerControl(collapsed=True).add_to(mapa)
 
     st.markdown("#### Mapa interactivo del área evaluada")
-    st.caption(
-        "Si aparece un divisor vertical, muévalo para comparar dos años. Use el botón "
-        "de capas ubicado dentro del mapa para mostrar u ocultar información."
-    )
+    if etiqueta_inicial and etiqueta_final:
+        st.markdown(
+            f"""
+            <div class="comparador-anios">
+              <span>◀ <b>Año inicial</b><br>{etiqueta_inicial}</span>
+              <span><b>Año final</b> ▶<br>{etiqueta_final}</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            "Arrastre el control circular del divisor vertical. El lado izquierdo muestra el "
+            "año inicial y el derecho el año final. Las capas temáticas adicionales comienzan "
+            "apagadas para no cubrir el barrido; puede activarlas después desde Layers."
+        )
+    else:
+        st.caption(
+            "Use el botón Layers dentro del mapa para mostrar u ocultar las capas disponibles."
+        )
     st_folium(
         mapa,
         height=650,
         use_container_width=True,
         returned_objects=[],
         key=(
-            f"mapa-{tipo_area}-{finca_seleccionada}-{modo_comparador}-"
+            f"mapa-{APP_VERSION}-{tipo_area}-{finca_seleccionada}-{modo_comparador}-"
             f"{anio_tmf_inicial}-{anio_tmf_final}-{anio_esri_inicial}-"
             f"{anio_esri_final}-{anio_ndvi_inicial}-{'-'.join(capas_activas)}-"
             f"{hash(geometria_dibujada_json or '')}"
