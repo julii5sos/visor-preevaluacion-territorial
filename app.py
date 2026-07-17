@@ -103,7 +103,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "1.2.2"
+APP_VERSION = "1.2.3"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
 ASSET_CUENCA = (
@@ -127,6 +127,7 @@ GEDI_ASSET = (
 
 ANO_HANSEN_MAX = 2025
 ANO_TMF_MAX = 2025
+ANO_DIAG_TMF = ANO_TMF_MAX
 ANO_ESRI_MIN = 2017
 ANO_ESRI_MAX = 2024
 ANO_NDVI_MAX = 2025
@@ -626,7 +627,7 @@ def reducir_superficies(imagen, geometria, escala, proyeccion=None):
 def ejecutar_analisis(
     tipo_area,
     finca_id,
-    anio_tmf,
+    anio_tmf_diagnostico,
     anio_esri_inicial,
     anio_esri_final,
     geometria_geojson=None,
@@ -635,7 +636,7 @@ def ejecutar_analisis(
     geometria = area_fc.geometry()
     area_ha = float(geometria.area(1).divide(10000).getInfo())
 
-    tmf = obtener_tmf(anio_tmf, geometria)
+    tmf = obtener_tmf(anio_tmf_diagnostico, geometria)
     esri_inicial = obtener_esri(anio_esri_inicial, geometria)
     esri_final = obtener_esri(anio_esri_final, geometria)
     perdida_post, perdida_pre, linea_base = imagenes_hansen(geometria)
@@ -822,7 +823,7 @@ def descargar_miniatura(imagen, geometria):
 def generar_mapas_reporte(
     tipo_area,
     finca_id,
-    anio_tmf,
+    anio_tmf_diagnostico,
     anio_esri_inicial,
     anio_esri_final,
     anio_ndvi_inicial,
@@ -830,7 +831,7 @@ def generar_mapas_reporte(
 ):
     area_fc = obtener_area(tipo_area, finca_id, geometria_geojson)
     geometria = area_fc.geometry()
-    tmf = obtener_tmf(anio_tmf, geometria)
+    tmf = obtener_tmf(anio_tmf_diagnostico, geometria)
     gedi = imagen_gedi(geometria)
     ndvi_final = obtener_ndvi(ANO_NDVI_MAX, geometria)
     ndvi_inicial = obtener_ndvi(anio_ndvi_inicial, geometria)
@@ -850,7 +851,7 @@ def generar_mapas_reporte(
             "Azul: agua | Verde: árboles | Amarillo: cultivos | Rojo: construido | Beige: pastizal",
         ),
         (
-            f"JRC TMF - Estado forestal {anio_tmf}",
+            f"JRC TMF - Estado forestal {anio_tmf_diagnostico}",
             visualizar_con_borde(tmf, VIS_TMF, area_fc),
             "Verde oscuro: bosque estable | Amarillo: degradación | Rojo: deforestación | Verde claro: recuperación",
         ),
@@ -909,7 +910,7 @@ def generar_mapas_reporte(
 def generar_pdf(
     nombre_area,
     resultados,
-    anio_tmf,
+    anio_tmf_diagnostico,
     anio_esri_inicial,
     anio_esri_final,
     anio_ndvi_inicial,
@@ -1060,7 +1061,7 @@ def generar_pdf(
         [Paragraph("Área evaluada", estilos["CuerpoFicha"]), Paragraph(nombre_area, estilos["CuerpoFicha"])],
         [Paragraph("Superficie total", estilos["CuerpoFicha"]), Paragraph(f"{area:,.2f} ha", estilos["CuerpoFicha"])],
         [Paragraph("Fecha del análisis", estilos["CuerpoFicha"]), Paragraph(date.today().strftime("%d/%m/%Y"), estilos["CuerpoFicha"])],
-        [Paragraph("Períodos principales", estilos["CuerpoFicha"]), Paragraph(f"JRC 2020-{anio_tmf} | ESRI {anio_esri_inicial}-{anio_esri_final} | NDVI {anio_ndvi_inicial}-{ANO_NDVI_MAX}", estilos["CuerpoFicha"])],
+        [Paragraph("Períodos principales", estilos["CuerpoFicha"]), Paragraph(f"JRC diagnóstico {anio_tmf_diagnostico} | ESRI {anio_esri_inicial}-{anio_esri_final} | NDVI {anio_ndvi_inicial}-{ANO_NDVI_MAX}", estilos["CuerpoFicha"])],
     ]
     tabla = Table(datos, colWidths=[4.0 * cm, 12.5 * cm])
     tabla.setStyle(
@@ -1165,7 +1166,7 @@ def generar_pdf(
             f"{r['esri_ganancia']:.1f} ha pasaron a árboles ({pct_ganancia:.1f}%). "
             f"Hansen registró {r['hansen_post']:.2f} ha de pérdida después del "
             f"{CUTOFF_LABEL}. {coincidencia}<br/><br/>"
-            f"<b>3. Condición del bosque y la vegetación.</b> JRC TMF {anio_tmf} registró "
+            f"<b>3. Condición del bosque y la vegetación.</b> JRC TMF {anio_tmf_diagnostico} registró "
             f"{r['tmf_estable']:.1f} ha de bosque estable, {r['tmf_degradacion']:.1f} ha "
             f"de degradación, {r['tmf_deforestacion']:.1f} ha de deforestación y "
             f"{r['tmf_recuperacion']:.1f} ha de recuperación. {texto_dosel}",
@@ -1253,7 +1254,7 @@ def generar_pdf(
     historia.extend([PageBreak(), Paragraph("DIAGNÓSTICO POR FUENTE", estilos["TituloFicha"])])
     filas_fuentes = [
         ["Fuente", "Resultado específico", "Señal"],
-        [f"JRC TMF {anio_tmf}", f"Deforestación {r['tmf_deforestacion']:.1f} ha; degradación {r['tmf_degradacion']:.1f} ha", "Sí" if r["senal_tmf"] else "No"],
+        [f"JRC TMF {anio_tmf_diagnostico}", f"Deforestación {r['tmf_deforestacion']:.1f} ha; degradación {r['tmf_degradacion']:.1f} ha", "Sí" if r["senal_tmf"] else "No"],
         [f"ESRI {anio_esri_inicial}-{anio_esri_final}", f"Salida de árboles {r['esri_salida']:.1f} ha ({r['pct_esri_salida']:.1f}%)", "Sí" if r["senal_esri"] else "No"],
         ["Hansen GFC", f"Pérdida posterior al {CUTOFF_LABEL}: {r['hansen_post']:.2f} ha", "Sí" if r["senal_hansen"] else "No"],
         ["GEDI", f"Dosel {r['gedi_altura']:.1f} m; área con datos válidos {r['gedi_cobertura_pct']:.0f}%" if r["gedi_disponible"] else "Datos insuficientes", "Contexto" if r["senal_gedi"] else "No"],
@@ -1337,7 +1338,12 @@ def mostrar_leyenda(titulo, elementos):
     st.markdown(html, unsafe_allow_html=True)
 
 
-def mostrar_resultados(resultados, anio_tmf, anio_esri_inicial, anio_esri_final):
+def mostrar_resultados(
+    resultados,
+    anio_tmf_diagnostico,
+    anio_esri_inicial,
+    anio_esri_final,
+):
     prioridad = resultados["prioridad"]
     color = {
         "Alta": "#b71c1c",
@@ -1373,7 +1379,7 @@ def mostrar_resultados(resultados, anio_tmf, anio_esri_inicial, anio_esri_final)
 
     filas = [
         (
-            f"Mapa forestal JRC {anio_tmf}",
+            f"Mapa forestal JRC {anio_tmf_diagnostico}",
             f"Deforestación {resultados['tmf_deforestacion']:.1f} ha; "
             f"degradación {resultados['tmf_degradacion']:.1f} ha",
             resultados["senal_tmf"],
@@ -1679,6 +1685,10 @@ try:
                     list(range(anio_tmf_inicial + 1, ANO_TMF_MAX + 1)),
                     index=len(list(range(anio_tmf_inicial + 1, ANO_TMF_MAX + 1))) - 1,
                 )
+                st.caption(
+                    f"Estos años cambian únicamente el barrido visual. El diagnóstico "
+                    f"utiliza siempre JRC TMF {ANO_DIAG_TMF}, igual que el visor GEE original."
+                )
             if modo_comparador == "ESRI LULC":
                 anio_esri_inicial = st.selectbox(
                     "Año inicial del uso del suelo:",
@@ -1742,12 +1752,13 @@ try:
     st.subheader("3. Ejecute la preevaluación")
     st.caption(
         "El visor calculará las señales y preparará automáticamente la ficha PDF con "
-        "seis mapas temáticos. El proceso puede tardar un momento."
+        f"seis mapas temáticos. El diagnóstico forestal utiliza JRC TMF {ANO_DIAG_TMF}; "
+        "los años del barrido no cambian el resultado. El proceso puede tardar un momento."
     )
     firma_actual = (
         tipo_area,
         finca_seleccionada,
-        anio_tmf_final,
+        ANO_DIAG_TMF,
         anio_esri_inicial,
         anio_esri_final,
         anio_ndvi_inicial,
@@ -1763,7 +1774,7 @@ try:
             resultados_nuevos = ejecutar_analisis(
                 tipo_area,
                 finca_seleccionada,
-                anio_tmf_final,
+                ANO_DIAG_TMF,
                 anio_esri_inicial,
                 anio_esri_final,
                 geometria_dibujada_json,
@@ -1771,7 +1782,7 @@ try:
             mapas_reporte, errores_mapas = generar_mapas_reporte(
                 tipo_area,
                 finca_seleccionada,
-                anio_tmf_final,
+                ANO_DIAG_TMF,
                 anio_esri_inicial,
                 anio_esri_final,
                 anio_ndvi_inicial,
@@ -1784,7 +1795,7 @@ try:
                 st.session_state["pdf_analisis"] = generar_pdf(
                     nombre_area,
                     resultados_nuevos,
-                    anio_tmf_final,
+                    ANO_DIAG_TMF,
                     anio_esri_inicial,
                     anio_esri_final,
                     anio_ndvi_inicial,
@@ -1797,7 +1808,7 @@ try:
         resultados = st.session_state["resultados_analisis"]
         mostrar_resultados(
             resultados,
-            anio_tmf_final,
+            ANO_DIAG_TMF,
             anio_esri_inicial,
             anio_esri_final,
         )
@@ -1943,17 +1954,17 @@ try:
     if "Deforestación JRC" in capas_activas:
         capa_gee(
             mapa,
-            obtener_tmf(anio_tmf_final, geometria).eq(3).selfMask(),
+            obtener_tmf(ANO_DIAG_TMF, geometria).eq(3).selfMask(),
             VIS_TMF_DEFOR,
-            f"Deforestación JRC {anio_tmf_final}",
+            f"Deforestación JRC {ANO_DIAG_TMF}",
             mostrar=mostrar_capas_auxiliares,
         )
     if "Degradación JRC" in capas_activas:
         capa_gee(
             mapa,
-            obtener_tmf(anio_tmf_final, geometria).eq(2).selfMask(),
+            obtener_tmf(ANO_DIAG_TMF, geometria).eq(2).selfMask(),
             VIS_TMF_DEGRAD,
-            f"Degradación JRC {anio_tmf_final}",
+            f"Degradación JRC {ANO_DIAG_TMF}",
             mostrar=mostrar_capas_auxiliares,
         )
     if "Uso y cobertura ESRI" in capas_activas:
