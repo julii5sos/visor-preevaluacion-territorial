@@ -199,7 +199,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "UX-0.1.1"
+APP_VERSION = "UX-0.1.2"
 METHODOLOGY_VERSION = "MT-2026.1"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
@@ -498,6 +498,10 @@ def construir_registro_metodologico(
         "aplicacion": APP_VERSION,
         "fecha_generacion": date.today().isoformat(),
         "codigo_reproducibilidad": huella,
+        "explicacion_codigo": (
+            "Identificador técnico generado a partir del área, las fuentes, los períodos, "
+            "los umbrales, los pesos y las reglas de esta configuración."
+        ),
         **configuracion,
         "alcance": (
             "Preevaluacion indicativa para priorizar revisiones. No constituye validacion "
@@ -1163,7 +1167,6 @@ def generar_pdf(
     anio_esri_final,
     anio_ndvi_inicial,
     mapas=None,
-    codigo_reproducibilidad=None,
 ):
     memoria = BytesIO()
     documento = SimpleDocTemplate(
@@ -1312,9 +1315,9 @@ def generar_pdf(
         [Paragraph("Fecha del análisis", estilos["CuerpoFicha"]), Paragraph(date.today().strftime("%d/%m/%Y"), estilos["CuerpoFicha"])],
         [Paragraph("Períodos principales", estilos["CuerpoFicha"]), Paragraph(f"JRC diagnóstico {anio_tmf_diagnostico} | ESRI {anio_esri_inicial}-{anio_esri_final} | NDVI {anio_ndvi_inicial}-{ANO_NDVI_MAX}", estilos["CuerpoFicha"])],
         [
-            Paragraph("Método y registro", estilos["CuerpoFicha"]),
+            Paragraph("Metodología aplicada", estilos["CuerpoFicha"]),
             Paragraph(
-                f"{METHODOLOGY_VERSION} | {codigo_reproducibilidad or 'sin código'}",
+                METHODOLOGY_VERSION,
                 estilos["CuerpoFicha"],
             ),
         ],
@@ -2012,14 +2015,6 @@ try:
                 f"ESRI {ANO_ESRI_MIN}-{ANO_ESRI_MAX} y NDVI 2022-{ANO_NDVI_MAX}."
             )
 
-    registro_configuracion = construir_registro_metodologico(
-        tipo_area,
-        finca_seleccionada,
-        geometria_dibujada_json,
-        anio_esri_inicial,
-        anio_esri_final,
-        anio_ndvi_inicial,
-    )
     st.markdown("### Selección actual")
     st.markdown(
         f"""
@@ -2027,7 +2022,7 @@ try:
           <div class="contexto-item"><small>Área</small><strong>{html_lib.escape(nombre_area)}</strong></div>
           <div class="contexto-item"><small>Superficie</small><strong>{superficie_ha:,.1f} ha</strong></div>
           <div class="contexto-item"><small>Enfoque</small><strong>{html_lib.escape(objetivo)}</strong></div>
-          <div class="contexto-item"><small>Registro del método</small><strong>{registro_configuracion['codigo_reproducibilidad']}</strong></div>
+          <div class="contexto-item"><small>Configuración</small><strong>{'Personalizada' if personalizar else 'Recomendada'}</strong></div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -2112,7 +2107,6 @@ try:
                     anio_esri_final,
                     anio_ndvi_inicial,
                     mapas_reporte,
-                    registro_configuracion["codigo_reproducibilidad"],
                 )
             else:
                 st.session_state.pop("pdf_analisis", None)
@@ -2441,13 +2435,7 @@ try:
                 mostrar_leyenda(titulo, elementos)
 
     with st.expander("Metodología y reproducibilidad", expanded=False):
-        st.markdown(
-            f"""
-            **Método:** `{METHODOLOGY_VERSION}`
-
-            **Registro de esta configuración:** `{registro_configuracion['codigo_reproducibilidad']}`
-            """
-        )
+        st.markdown(f"**Metodología aplicada:** {METHODOLOGY_VERSION}")
         tab_fuentes, tab_reglas, tab_limites = st.tabs(
             ["Fuentes y períodos", "Reglas del análisis", "Alcance y limitaciones"]
         )
