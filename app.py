@@ -103,7 +103,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "1.2.3"
+APP_VERSION = "1.2.4"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
 ASSET_CUENCA = (
@@ -804,7 +804,10 @@ def descargar_miniatura(imagen, geometria):
     url = ee.Image(imagen).getThumbURL(
         {
             "region": region,
-            "dimensions": "1200x760",
+            # Una sola dimensión hace que Earth Engine calcule la otra de
+            # forma proporcional. WIDTHxHEIGHT puede deformar el territorio.
+            "dimensions": 1600,
+            "crs": "EPSG:3857",
             "format": "png",
         }
     )
@@ -1197,21 +1200,37 @@ def generar_pdf(
         historia.append(Paragraph(cuerpo, estilos["CuerpoFicha"]))
 
     historia.extend([PageBreak(), Paragraph("MAPAS TEMÁTICOS DEL ÁREA EVALUADA", estilos["TituloFicha"])])
-    celdas = []
     for mapa in mapas or []:
         contenido = [Paragraph(mapa["titulo"], estilos["MapaTitulo"])]
         if mapa.get("imagen"):
             imagen = ReportLabImage(BytesIO(mapa["imagen"]))
-            escala = min((7.65 * cm) / imagen.imageWidth, (4.85 * cm) / imagen.imageHeight)
+            # Se conserva la proporción original y solo se limita el tamaño
+            # máximo. La celda aumenta su altura según el mapa.
+            escala = min(
+                (15.75 * cm) / imagen.imageWidth,
+                (9.8 * cm) / imagen.imageHeight,
+            )
             imagen.drawWidth = imagen.imageWidth * escala
             imagen.drawHeight = imagen.imageHeight * escala
-            contenido.extend([imagen, Spacer(1, 2)])
+            tabla_imagen = Table([[imagen]], colWidths=[15.75 * cm])
+            tabla_imagen.setStyle(
+                TableStyle(
+                    [
+                        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                        ("TOPPADDING", (0, 0), (-1, -1), 0),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                    ]
+                )
+            )
+            contenido.extend([tabla_imagen, Spacer(1, 2)])
         else:
             contenido.append(
                 Table(
                     [[Paragraph("Imagen no disponible. Consulte el mapa interactivo.", estilos["MapaNota"])]],
-                    colWidths=[7.4 * cm],
-                    rowHeights=[4.6 * cm],
+                    colWidths=[15.4 * cm],
+                    rowHeights=[7.0 * cm],
                     style=TableStyle(
                         [
                             ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#bdbdbd")),
@@ -1222,26 +1241,20 @@ def generar_pdf(
                 )
             )
         contenido.append(Paragraph(mapa["leyenda"], estilos["MapaNota"]))
-        celdas.append(contenido)
-    if celdas:
-        filas_mapas = [celdas[i : i + 2] for i in range(0, len(celdas), 2)]
-        if len(filas_mapas[-1]) == 1:
-            filas_mapas[-1].append("")
-        tabla_mapas = Table(filas_mapas, colWidths=[8.15 * cm, 8.15 * cm])
-        tabla_mapas.setStyle(
+        tabla_mapa = Table([[contenido]], colWidths=[16.3 * cm], hAlign="CENTER")
+        tabla_mapa.setStyle(
             TableStyle(
                 [
                     ("BOX", (0, 0), (-1, -1), 0.45, borde),
-                    ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#c8d6c4")),
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 5),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 5),
-                    ("TOPPADDING", (0, 0), (-1, -1), 5),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+                    ("TOPPADDING", (0, 0), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
                 ]
             )
         )
-        historia.append(tabla_mapas)
+        historia.extend([tabla_mapa, Spacer(1, 7)])
     historia.append(
         Paragraph(
             "Nota cartográfica: el contorno celeste identifica el área evaluada. Las imágenes "
