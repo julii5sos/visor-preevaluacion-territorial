@@ -103,7 +103,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "1.2.4"
+APP_VERSION = "1.2.5"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
 ASSET_CUENCA = (
@@ -801,25 +801,39 @@ def visualizar_con_borde(imagen, visualizacion, area_fc, fondo=None):
 
 def descargar_miniatura(imagen, geometria):
     region = geometria.bounds(1).coordinates().getInfo()
-    url = ee.Image(imagen).getThumbURL(
-        {
-            "region": region,
-            # Una sola dimensión hace que Earth Engine calcule la otra de
-            # forma proporcional. WIDTHxHEIGHT puede deformar el territorio.
-            "dimensions": 1600,
-            "crs": "EPSG:3857",
-            "format": "png",
-        }
+    intentos_fallidos = []
+    # Una sola dimensión conserva la proporción. Si Earth Engine no logra
+    # renderizar una miniatura, se reintenta con menos píxeles para evitar que
+    # el PDF pierda el mapa completo por un fallo temporal o de recursos.
+    for dimension in (1200, 900, 700):
+        try:
+            url = ee.Image(imagen).getThumbURL(
+                {
+                    "region": region,
+                    "dimensions": dimension,
+                    "format": "png",
+                }
+            )
+            respuesta = requests.get(
+                url,
+                timeout=75,
+                headers={"User-Agent": "visor-preevaluacion-territorial/1.0"},
+            )
+            respuesta.raise_for_status()
+            if (
+                len(respuesta.content) < 1000
+                or not respuesta.content.startswith(b"\x89PNG")
+            ):
+                raise RuntimeError("respuesta PNG no válida")
+            return respuesta.content
+        except Exception as error:
+            # Se registra solo el tipo para no exponer URL o tokens temporales.
+            intentos_fallidos.append(f"{dimension}px: {type(error).__name__}")
+    raise RuntimeError(
+        "Miniatura no disponible después de reintentos ("
+        + ", ".join(intentos_fallidos)
+        + ")."
     )
-    respuesta = requests.get(
-        url,
-        timeout=60,
-        headers={"User-Agent": "visor-preevaluacion-territorial/1.0"},
-    )
-    respuesta.raise_for_status()
-    if len(respuesta.content) < 1000 or not respuesta.content.startswith(b"\x89PNG"):
-        raise RuntimeError("Earth Engine no devolvió una imagen PNG válida.")
-    return respuesta.content
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -902,7 +916,13 @@ def generar_mapas_reporte(
             )
         except Exception as error:
             mapas.append({"titulo": titulo, "imagen": None, "leyenda": leyenda})
-            errores.append(f"{titulo}: {type(error).__name__}")
+            detalle = (
+                str(error)
+                if isinstance(error, RuntimeError)
+                and str(error).startswith("Miniatura no disponible")
+                else type(error).__name__
+            )
+            errores.append(f"{titulo}: {detalle}")
     return mapas, errores
 
 
