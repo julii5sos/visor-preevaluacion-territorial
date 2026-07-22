@@ -200,7 +200,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "UX-0.1.4"
+APP_VERSION = "UX-0.1.5"
 METHODOLOGY_VERSION = "MT-2026.1"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
@@ -2292,6 +2292,7 @@ try:
                 data=informe_actual,
                 file_name=f"ficha_preevaluacion_{nombre_archivo}.pdf",
                 mime="application/pdf",
+                on_click="ignore",
                 type="primary",
                 use_container_width=True,
             )
@@ -2309,6 +2310,7 @@ try:
             ),
             file_name=f"metodologia_preevaluacion_{nombre_archivo}.json",
             mime="application/json",
+            on_click="ignore",
             use_container_width=True,
             help="Contiene fuentes, períodos, umbrales, pesos, reglas y el resumen del resultado.",
         )

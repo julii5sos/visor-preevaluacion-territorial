@@ -4,7 +4,16 @@ Este historial documenta la evolución de la aplicación UX. Las versiones sigue
 el formato `MAJOR.MINOR.PATCH`: una versión principal, mejoras compatibles y
 correcciones compatibles, respectivamente.
 
-## [0.1.4] - 2026-07-21 — versión actual
+## [0.1.5] - 2026-07-22 — versión actual
+
+### Corregido
+
+- Descargar el registro metodológico JSON ya no reinicia la aplicación ni
+  interrumpe la preparación de los mapas del informe PDF.
+- Descargar un PDF ya preparado tampoco provoca una nueva ejecución de
+  Streamlit.
+
+## [0.1.4] - 2026-07-21
 
 ### Mejorado
 
@@ -72,6 +81,7 @@ correcciones compatibles, respectivamente.
 - El alcance indicativo: la aplicación no constituye validación de campo ni
   determina cumplimiento EUDR.
 
+[0.1.5]: https://github.com/julii5sos/visor-preevaluacion-territorial/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/julii5sos/visor-preevaluacion-territorial/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/julii5sos/visor-preevaluacion-territorial/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/julii5sos/visor-preevaluacion-territorial/compare/v0.1.1...v0.1.2
