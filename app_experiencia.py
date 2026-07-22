@@ -2,6 +2,7 @@ import html as html_lib
 import hashlib
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from io import BytesIO
 
@@ -199,7 +200,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "UX-0.1.3"
+APP_VERSION = "UX-0.1.4"
 METHODOLOGY_VERSION = "MT-2026.1"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
@@ -1052,41 +1053,100 @@ def visualizar_con_borde(imagen, visualizacion, area_fc, fondo=None):
     return visual.blend(borde)
 
 
-def descargar_miniatura(imagen, geometria):
-    region = geometria.bounds(1).coordinates().getInfo()
-    intentos_fallidos = []
-    # Una sola dimensión conserva la proporción. Si Earth Engine no logra
-    # renderizar una miniatura, se reintenta con menos píxeles para evitar que
-    # el PDF pierda el mapa completo por un fallo temporal o de recursos.
-    for dimension in (1200, 900, 700):
-        try:
-            url = ee.Image(imagen).getThumbURL(
-                {
-                    "region": region,
-                    "dimensions": dimension,
-                    "format": "png",
-                }
-            )
-            respuesta = requests.get(
-                url,
-                timeout=75,
-                headers={"User-Agent": "visor-preevaluacion-territorial/1.0"},
-            )
-            respuesta.raise_for_status()
-            if (
-                len(respuesta.content) < 1000
-                or not respuesta.content.startswith(b"\x89PNG")
-            ):
-                raise RuntimeError("respuesta PNG no válida")
-            return respuesta.content
-        except Exception as error:
-            # Se registra solo el tipo para no exponer URL o tokens temporales.
-            intentos_fallidos.append(f"{dimension}px: {type(error).__name__}")
-    raise RuntimeError(
-        "Miniatura no disponible después de reintentos ("
-        + ", ".join(intentos_fallidos)
-        + ")."
+def crear_url_miniatura(imagen, region, dimension):
+    """Solicita a Earth Engine una URL temporal sin descargar todavía el PNG."""
+    return ee.Image(imagen).getThumbURL(
+        {
+            "region": region,
+            # Una dimensión conserva la proporción original del territorio.
+            "dimensions": dimension,
+            "format": "png",
+        }
     )
+
+
+def descargar_url_miniatura(url):
+    """Descarga y valida una miniatura ya preparada por Earth Engine."""
+    respuesta = requests.get(
+        url,
+        timeout=(10, 60),
+        headers={"User-Agent": "visor-preevaluacion-territorial/1.0"},
+    )
+    respuesta.raise_for_status()
+    if len(respuesta.content) < 1000 or not respuesta.content.startswith(b"\x89PNG"):
+        raise RuntimeError("respuesta PNG no válida")
+    return respuesta.content
+
+
+def descargar_miniaturas(especificaciones, geometria, mapas_existentes=None):
+    """Descarga los mapas en paralelo y reintenta únicamente los que fallan."""
+    # Antes se consultaban estos límites una vez por cada mapa. Una sola consulta
+    # reduce seis viajes innecesarios a Earth Engine.
+    region = geometria.bounds(1).coordinates().getInfo()
+    existentes_por_titulo = {
+        mapa["titulo"]: mapa
+        for mapa in (mapas_existentes or [])
+        if mapa.get("imagen")
+    }
+    resultados = [
+        existentes_por_titulo.get(titulo)
+        for titulo, _, _ in especificaciones
+    ]
+    pendientes = {
+        indice for indice, resultado in enumerate(resultados) if resultado is None
+    }
+    fallos = {indice: [] for indice in pendientes}
+
+    # 1200 px conserva buena definición para el PDF. El segundo intento a 800 px
+    # reduce el costo solo cuando Earth Engine no logra servir el mapa principal.
+    for dimension in (1200, 800):
+        if not pendientes:
+            break
+
+        urls = {}
+        for indice in list(pendientes):
+            titulo, imagen, _ = especificaciones[indice]
+            try:
+                urls[indice] = crear_url_miniatura(imagen, region, dimension)
+            except Exception as error:
+                fallos[indice].append(
+                    f"{dimension}px al solicitar: {type(error).__name__}"
+                )
+
+        if not urls:
+            continue
+
+        # Tres solicitudes simultáneas acortan la espera sin saturar la cuota de
+        # Earth Engine ni la memoria limitada de Streamlit Community Cloud.
+        trabajadores = min(3, len(urls))
+        with ThreadPoolExecutor(max_workers=trabajadores) as ejecutor:
+            futuros = {
+                ejecutor.submit(descargar_url_miniatura, url): indice
+                for indice, url in urls.items()
+            }
+            for futuro in as_completed(futuros):
+                indice = futuros[futuro]
+                titulo, _, leyenda = especificaciones[indice]
+                try:
+                    resultados[indice] = {
+                        "titulo": titulo,
+                        "imagen": futuro.result(),
+                        "leyenda": leyenda,
+                    }
+                    pendientes.discard(indice)
+                except Exception as error:
+                    # No se registran la URL ni sus tokens temporales.
+                    fallos[indice].append(f"{dimension}px: {type(error).__name__}")
+
+    errores = []
+    for indice in sorted(pendientes):
+        titulo, _, leyenda = especificaciones[indice]
+        resultados[indice] = {"titulo": titulo, "imagen": None, "leyenda": leyenda}
+        errores.append(
+            f"{titulo}: Miniatura no disponible después de reintentos "
+            f"({', '.join(fallos[indice]) or 'sin respuesta'})."
+        )
+    return resultados, errores
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -1099,6 +1159,7 @@ def generar_mapas_reporte(
     anio_ndvi_inicial,
     geometria_geojson=None,
     intento_cache=0,
+    _mapas_existentes=None,
 ):
     # El número de intento forma parte de la clave de caché y permite reintentar
     # si Earth Engine no entrega alguna miniatura temporalmente.
@@ -1160,27 +1221,7 @@ def generar_mapas_reporte(
         ),
     ]
 
-    mapas = []
-    errores = []
-    for titulo, imagen, leyenda in especificaciones:
-        try:
-            mapas.append(
-                {
-                    "titulo": titulo,
-                    "imagen": descargar_miniatura(imagen, geometria),
-                    "leyenda": leyenda,
-                }
-            )
-        except Exception as error:
-            mapas.append({"titulo": titulo, "imagen": None, "leyenda": leyenda})
-            detalle = (
-                str(error)
-                if isinstance(error, RuntimeError)
-                and str(error).startswith("Miniatura no disponible")
-                else type(error).__name__
-            )
-            errores.append(f"{titulo}: {detalle}")
-    return mapas, errores
+    return descargar_miniaturas(especificaciones, geometria, _mapas_existentes)
 
 
 # -----------------------------------------------------------------------------
@@ -2121,6 +2162,8 @@ try:
                 st.session_state.pop("pdf_analisis", None)
                 st.session_state.pop("firma_informe", None)
                 st.session_state.pop("errores_mapas", None)
+                st.session_state.pop("intento_informe", None)
+                st.session_state.pop("mapas_reporte", None)
 
     if st.session_state.get("firma_analisis") == firma_actual:
         resultados = st.session_state["resultados_analisis"]
@@ -2145,40 +2188,102 @@ try:
             st.session_state.get("firma_informe") == firma_actual
             and st.session_state.get("pdf_analisis")
         )
-        if not informe_actual:
+        errores_informe = (
+            st.session_state.get("errores_mapas", [])
+            if st.session_state.get("firma_informe") == firma_actual
+            else []
+        )
+        if not informe_actual or errores_informe:
+            etiqueta_informe = (
+                "Reintentar mapas faltantes"
+                if informe_actual and errores_informe
+                else "Preparar informe PDF"
+            )
             preparar_informe = columna_pdf.button(
-                "Preparar informe PDF",
+                etiqueta_informe,
                 use_container_width=True,
-                help="Solicita las seis imágenes temáticas a Earth Engine y arma el documento.",
+                key="preparar-informe-pdf",
+                help=(
+                    "Solicita en paralelo las seis imágenes temáticas a Earth Engine y arma "
+                    "el documento. Si ya existe un informe parcial, vuelve a intentar los mapas."
+                ),
             )
             if preparar_informe:
-                intento_informe = st.session_state.get("intento_informe", 0) + 1
+                # El primer intento conserva una clave de caché estable. Solo se
+                # crea una clave nueva cuando el usuario reintenta mapas faltantes.
+                intento_informe = (
+                    st.session_state.get("intento_informe", 0) + 1
+                    if errores_informe
+                    else 0
+                )
                 st.session_state["intento_informe"] = intento_informe
-                with st.spinner("Preparando las seis imágenes y el informe PDF..."):
-                    mapas_reporte, errores_mapas = generar_mapas_reporte(
-                        tipo_area,
-                        finca_seleccionada,
-                        ANO_DIAG_TMF,
-                        anio_esri_inicial,
-                        anio_esri_final,
-                        anio_ndvi_inicial,
-                        geometria_dibujada_json,
-                        intento_informe,
-                    )
-                    st.session_state["errores_mapas"] = errores_mapas
-                    st.session_state["firma_informe"] = firma_actual
-                    if any(mapa.get("imagen") for mapa in mapas_reporte):
-                        st.session_state["pdf_analisis"] = generar_pdf(
-                            nombre_area,
-                            resultados,
+                with st.status(
+                    "Preparando el informe cartográfico...",
+                    expanded=True,
+                ) as estado_informe:
+                    try:
+                        estado_informe.write(
+                            "Solicitando seis mapas a Earth Engine en grupos de tres."
+                        )
+                        mapas_reporte, errores_mapas = generar_mapas_reporte(
+                            tipo_area,
+                            finca_seleccionada,
                             ANO_DIAG_TMF,
                             anio_esri_inicial,
                             anio_esri_final,
                             anio_ndvi_inicial,
-                            mapas_reporte,
+                            geometria_dibujada_json,
+                            intento_informe,
+                            st.session_state.get("mapas_reporte")
+                            if errores_informe
+                            else None,
                         )
-                    else:
+                        disponibles = sum(
+                            1 for mapa_reporte in mapas_reporte if mapa_reporte.get("imagen")
+                        )
+                        estado_informe.write(
+                            f"Earth Engine entregó {disponibles} de 6 mapas. Armando el PDF."
+                        )
+                        st.session_state["errores_mapas"] = errores_mapas
+                        st.session_state["mapas_reporte"] = mapas_reporte
+                        st.session_state["firma_informe"] = firma_actual
+                        if disponibles:
+                            st.session_state["pdf_analisis"] = generar_pdf(
+                                nombre_area,
+                                resultados,
+                                ANO_DIAG_TMF,
+                                anio_esri_inicial,
+                                anio_esri_final,
+                                anio_ndvi_inicial,
+                                mapas_reporte,
+                            )
+                            estado_informe.update(
+                                label="Informe listo para descargar",
+                                state="complete",
+                                expanded=False,
+                            )
+                        else:
+                            st.session_state.pop("pdf_analisis", None)
+                            estado_informe.update(
+                                label="Earth Engine no entregó los mapas",
+                                state="error",
+                                expanded=True,
+                            )
+                    except Exception as error:
                         st.session_state.pop("pdf_analisis", None)
+                        st.session_state.pop("firma_informe", None)
+                        st.session_state["errores_mapas"] = [
+                            f"Preparación del informe: {type(error).__name__}"
+                        ]
+                        estado_informe.update(
+                            label="No fue posible preparar el informe",
+                            state="error",
+                            expanded=True,
+                        )
+                        st.error(
+                            "La solicitud cartográfica no finalizó. Puede intentarlo nuevamente; "
+                            "los resultados del análisis permanecen disponibles."
+                        )
                 informe_actual = st.session_state.get("pdf_analisis")
 
         if informe_actual:
@@ -2192,7 +2297,7 @@ try:
             )
         else:
             columna_pdf.caption(
-                "El PDF se prepara por separado porque las imágenes cartográficas requieren más tiempo."
+                "El PDF se prepara por separado. Los seis mapas se solicitan en paralelo para reducir la espera."
             )
         columna_metodo.download_button(
             "Descargar registro metodológico",

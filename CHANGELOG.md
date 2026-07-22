@@ -4,7 +4,24 @@ Este historial documenta la evolución de la aplicación UX. Las versiones sigue
 el formato `MAJOR.MINOR.PATCH`: una versión principal, mejoras compatibles y
 correcciones compatibles, respectivamente.
 
-## [0.1.3] - 2026-07-21 — versión actual
+## [0.1.4] - 2026-07-21 — versión actual
+
+### Mejorado
+
+- Los seis mapas del informe se descargan en paralelo, en grupos de tres, en vez
+  de esperar cada mapa de forma consecutiva.
+- Los límites del área se solicitan una sola vez a Earth Engine para toda la
+  generación cartográfica.
+- Cada mapa dispone de un intento principal y un segundo intento más liviano;
+  se eliminaron esperas consecutivas innecesarias.
+- Cuando el usuario reintenta un informe parcial, se conservan los mapas que ya
+  fueron descargados y se solicitan únicamente los faltantes.
+- El primer informe conserva una clave de caché estable y solo se invalida cuando
+  es necesario reintentar mapas faltantes.
+- La interfaz informa cuántos mapas fueron entregados antes de armar el PDF y
+  conserva los resultados si la generación cartográfica falla.
+
+## [0.1.3] - 2026-07-21
 
 ### Mejorado
 
@@ -55,6 +72,7 @@ correcciones compatibles, respectivamente.
 - El alcance indicativo: la aplicación no constituye validación de campo ni
   determina cumplimiento EUDR.
 
+[0.1.4]: https://github.com/julii5sos/visor-preevaluacion-territorial/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/julii5sos/visor-preevaluacion-territorial/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/julii5sos/visor-preevaluacion-territorial/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/julii5sos/visor-preevaluacion-territorial/compare/v0.1.0...v0.1.1
