@@ -199,7 +199,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "UX-0.1.2"
+APP_VERSION = "UX-0.1.3"
 METHODOLOGY_VERSION = "MT-2026.1"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
@@ -487,6 +487,7 @@ def construir_registro_metodologico(
         "procesamiento": {
             "unidad_area": "hectareas",
             "reduccion": "suma de area por clase en la proyeccion de cada fuente",
+            "respuesta_earth_engine": "reducciones agrupadas en una sola respuesta",
             "ndvi": "mediana anual con mascara SCL y respaldo del ano anterior",
             "formula_ndvi": "(B8 - B4) / (B8 + B4)",
         },
@@ -849,7 +850,7 @@ def reducir_superficies(imagen, geometria, escala, proyeccion=None):
     }
     if proyeccion is not None:
         parametros["crs"] = proyeccion
-    return imagen.reduceRegion(**parametros).getInfo()
+    return ee.Dictionary(imagen.reduceRegion(**parametros))
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -863,7 +864,6 @@ def ejecutar_analisis(
 ):
     area_fc = obtener_area(tipo_area, finca_id, geometria_geojson)
     geometria = area_fc.geometry()
-    area_ha = float(geometria.area(1).divide(10000).getInfo())
 
     tmf = obtener_tmf(anio_tmf_diagnostico, geometria)
     esri_inicial = obtener_esri(anio_esri_inicial, geometria)
@@ -898,52 +898,76 @@ def ejecutar_analisis(
         ]
     )
 
-    resumen_areas = {}
-    resumen_areas.update(
+    # Las reducciones conservan la escala y proyección de cada fuente, pero se
+    # agrupan en una sola respuesta para evitar varios viajes de red consecutivos.
+    resumen = (
         reducir_superficies(areas_tmf, geometria, 30, tmf.projection())
-    )
-    resumen_areas.update(
-        reducir_superficies(
-            areas_hansen,
-            geometria,
-            30,
-            ee.Image(HANSEN_ASSET).projection(),
+        .combine(
+            reducir_superficies(
+                areas_hansen,
+                geometria,
+                30,
+                ee.Image(HANSEN_ASSET).projection(),
+            ),
+            True,
         )
-    )
-    resumen_areas.update(
-        reducir_superficies(
-            areas_esri,
-            geometria,
-            10,
-            esri_final.projection(),
+        .combine(
+            reducir_superficies(
+                areas_esri,
+                geometria,
+                10,
+                esri_final.projection(),
+            ),
+            True,
         )
+        .combine(
+            ee.Dictionary(
+                {
+                    "area_ha": geometria.area(1).divide(10000),
+                    "gedi_altura": gedi.reduceRegion(
+                        reducer=ee.Reducer.mean(),
+                        geometry=geometria,
+                        scale=100,
+                        bestEffort=True,
+                        maxPixels=1e9,
+                        tileScale=4,
+                    ).get("altura_dosel"),
+                    "gedi_area_datos": gedi.mask()
+                    .multiply(pixel_ha)
+                    .reduceRegion(
+                        reducer=ee.Reducer.sum(),
+                        geometry=geometria,
+                        scale=100,
+                        bestEffort=True,
+                        maxPixels=1e9,
+                        tileScale=4,
+                    )
+                    .get("altura_dosel"),
+                }
+            ),
+            True,
+        )
+        .getInfo()
     )
 
-    resumen_gedi = ee.Dictionary(
-        {
-            "altura": gedi.reduceRegion(
-                reducer=ee.Reducer.mean(),
-                geometry=geometria,
-                scale=100,
-                bestEffort=True,
-                maxPixels=1e9,
-                tileScale=4,
-            ).get("altura_dosel"),
-            "area_datos": gedi.mask().multiply(pixel_ha).reduceRegion(
-                reducer=ee.Reducer.sum(),
-                geometry=geometria,
-                scale=100,
-                bestEffort=True,
-                maxPixels=1e9,
-                tileScale=4,
-            ).get("altura_dosel"),
-        }
-    ).getInfo()
-
-    resultados = {clave: numero(resumen_areas, clave) for clave in resumen_areas}
+    claves_areas = [
+        "tmf_estable",
+        "tmf_degradacion",
+        "tmf_deforestacion",
+        "tmf_recuperacion",
+        "hansen_post",
+        "hansen_pre",
+        "linea_base",
+        "esri_arboles_final",
+        "esri_salida",
+        "esri_ganancia",
+        "esri_estable",
+    ]
+    resultados = {clave: numero(resumen, clave) for clave in claves_areas}
+    area_ha = numero(resumen, "area_ha")
     resultados["area_ha"] = area_ha
-    resultados["gedi_altura"] = numero(resumen_gedi, "altura")
-    resultados["gedi_area_datos"] = numero(resumen_gedi, "area_datos")
+    resultados["gedi_altura"] = numero(resumen, "gedi_altura")
+    resultados["gedi_area_datos"] = numero(resumen, "gedi_area_datos")
     resultados["gedi_cobertura_pct"] = (
         resultados["gedi_area_datos"] / area_ha * 100 if area_ha else 0
     )
@@ -1074,7 +1098,11 @@ def generar_mapas_reporte(
     anio_esri_final,
     anio_ndvi_inicial,
     geometria_geojson=None,
+    intento_cache=0,
 ):
+    # El número de intento forma parte de la clave de caché y permite reintentar
+    # si Earth Engine no entrega alguna miniatura temporalmente.
+    _ = intento_cache
     area_fc = obtener_area(tipo_area, finca_id, geometria_geojson)
     geometria = area_fc.geometry()
     tmf = obtener_tmf(anio_tmf_diagnostico, geometria)
@@ -2058,9 +2086,9 @@ try:
 
     st.subheader("Ejecutar y revisar resultados")
     st.caption(
-        "Se calcularán las señales con los parámetros documentados y se preparará el informe "
-        f"con seis mapas. JRC TMF {ANO_DIAG_TMF} permanece fijo para comparar todas las áreas "
-        "con el mismo criterio."
+        "Primero se calcularán únicamente las señales y el resumen. El informe con seis mapas "
+        "se preparará después, solo si usted lo solicita. "
+        f"JRC TMF {ANO_DIAG_TMF} permanece fijo para comparar todas las áreas con el mismo criterio."
     )
     firma_actual = (
         tipo_area,
@@ -2075,9 +2103,10 @@ try:
         "Ejecutar análisis",
         type="primary",
         use_container_width=True,
-        help="Calcula las señales, genera los mapas y prepara los archivos de respaldo.",
+        help="Calcula las señales territoriales. El PDF se prepara por separado para reducir la espera.",
     ):
-        with st.spinner("Procesando las fuentes satelitales y preparando la evidencia..."):
+        firma_anterior = st.session_state.get("firma_analisis")
+        with st.spinner("Calculando las señales territoriales..."):
             resultados_nuevos = ejecutar_analisis(
                 tipo_area,
                 finca_seleccionada,
@@ -2086,30 +2115,12 @@ try:
                 anio_esri_final,
                 geometria_dibujada_json,
             )
-            mapas_reporte, errores_mapas = generar_mapas_reporte(
-                tipo_area,
-                finca_seleccionada,
-                ANO_DIAG_TMF,
-                anio_esri_inicial,
-                anio_esri_final,
-                anio_ndvi_inicial,
-                geometria_dibujada_json,
-            )
             st.session_state["resultados_analisis"] = resultados_nuevos
             st.session_state["firma_analisis"] = firma_actual
-            st.session_state["errores_mapas"] = errores_mapas
-            if any(mapa.get("imagen") for mapa in mapas_reporte):
-                st.session_state["pdf_analisis"] = generar_pdf(
-                    nombre_area,
-                    resultados_nuevos,
-                    ANO_DIAG_TMF,
-                    anio_esri_inicial,
-                    anio_esri_final,
-                    anio_ndvi_inicial,
-                    mapas_reporte,
-                )
-            else:
+            if firma_anterior != firma_actual:
                 st.session_state.pop("pdf_analisis", None)
+                st.session_state.pop("firma_informe", None)
+                st.session_state.pop("errores_mapas", None)
 
     if st.session_state.get("firma_analisis") == firma_actual:
         resultados = st.session_state["resultados_analisis"]
@@ -2119,22 +2130,6 @@ try:
             anio_esri_inicial,
             anio_esri_final,
         )
-        errores_mapas = st.session_state.get("errores_mapas", [])
-        if errores_mapas:
-            disponibles = 6 - len(errores_mapas)
-            if disponibles:
-                st.warning(
-                    f"El informe contiene {disponibles} de 6 mapas. Algunas imágenes "
-                    "no estuvieron disponibles temporalmente; puede ejecutar nuevamente el análisis."
-                )
-            else:
-                st.error(
-                    "Earth Engine no entregó las imágenes cartográficas. No se generó un PDF "
-                    "incompleto. Ejecute nuevamente la preevaluación y, si continúa, envíe el "
-                    "detalle técnico mostrado abajo."
-                )
-            with st.expander("Detalle de los mapas no disponibles", expanded=False):
-                st.code("\n".join(errores_mapas))
         registro_resultados = construir_registro_metodologico(
             tipo_area,
             finca_seleccionada,
@@ -2146,14 +2141,58 @@ try:
         )
         nombre_archivo = re.sub(r"[^A-Za-z0-9_-]+", "_", nombre_area).strip("_").lower()
         columna_pdf, columna_metodo = st.columns(2)
-        if st.session_state.get("pdf_analisis"):
+        informe_actual = (
+            st.session_state.get("firma_informe") == firma_actual
+            and st.session_state.get("pdf_analisis")
+        )
+        if not informe_actual:
+            preparar_informe = columna_pdf.button(
+                "Preparar informe PDF",
+                use_container_width=True,
+                help="Solicita las seis imágenes temáticas a Earth Engine y arma el documento.",
+            )
+            if preparar_informe:
+                intento_informe = st.session_state.get("intento_informe", 0) + 1
+                st.session_state["intento_informe"] = intento_informe
+                with st.spinner("Preparando las seis imágenes y el informe PDF..."):
+                    mapas_reporte, errores_mapas = generar_mapas_reporte(
+                        tipo_area,
+                        finca_seleccionada,
+                        ANO_DIAG_TMF,
+                        anio_esri_inicial,
+                        anio_esri_final,
+                        anio_ndvi_inicial,
+                        geometria_dibujada_json,
+                        intento_informe,
+                    )
+                    st.session_state["errores_mapas"] = errores_mapas
+                    st.session_state["firma_informe"] = firma_actual
+                    if any(mapa.get("imagen") for mapa in mapas_reporte):
+                        st.session_state["pdf_analisis"] = generar_pdf(
+                            nombre_area,
+                            resultados,
+                            ANO_DIAG_TMF,
+                            anio_esri_inicial,
+                            anio_esri_final,
+                            anio_ndvi_inicial,
+                            mapas_reporte,
+                        )
+                    else:
+                        st.session_state.pop("pdf_analisis", None)
+                informe_actual = st.session_state.get("pdf_analisis")
+
+        if informe_actual:
             columna_pdf.download_button(
                 "Descargar informe PDF",
-                data=st.session_state["pdf_analisis"],
+                data=informe_actual,
                 file_name=f"ficha_preevaluacion_{nombre_archivo}.pdf",
                 mime="application/pdf",
                 type="primary",
                 use_container_width=True,
+            )
+        else:
+            columna_pdf.caption(
+                "El PDF se prepara por separado porque las imágenes cartográficas requieren más tiempo."
             )
         columna_metodo.download_button(
             "Descargar registro metodológico",
@@ -2168,6 +2207,24 @@ try:
             use_container_width=True,
             help="Contiene fuentes, períodos, umbrales, pesos, reglas y el resumen del resultado.",
         )
+
+        if st.session_state.get("firma_informe") == firma_actual:
+            errores_mapas = st.session_state.get("errores_mapas", [])
+            if errores_mapas:
+                disponibles = 6 - len(errores_mapas)
+                if disponibles:
+                    st.warning(
+                        f"El informe contiene {disponibles} de 6 mapas. Algunas imágenes no "
+                        "estuvieron disponibles temporalmente; puede volver a preparar el PDF."
+                    )
+                else:
+                    st.error(
+                        "Earth Engine no entregó las imágenes cartográficas. No se generó un PDF "
+                        "incompleto. Vuelva a preparar el informe y, si continúa, envíe el detalle "
+                        "técnico mostrado abajo."
+                    )
+                with st.expander("Detalle de los mapas no disponibles", expanded=False):
+                    st.code("\n".join(errores_mapas))
     elif "resultados_analisis" in st.session_state:
         st.warning(
             "Cambió el área o el período. Ejecute nuevamente la preevaluación para "

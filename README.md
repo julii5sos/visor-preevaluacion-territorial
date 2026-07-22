@@ -74,7 +74,10 @@ Nunca se debe guardar el archivo JSON real en el repositorio.
 ## Rendimiento
 
 - Las capas se solicitan a Earth Engine solo cuando están activas.
-- El análisis y el informe se generan únicamente al pulsar el botón.
+- El análisis entrega primero los resultados; el informe con seis mapas se prepara
+  únicamente cuando el usuario lo solicita.
+- Las reducciones de JRC, Hansen, ESRI y GEDI se agrupan en una sola respuesta de
+  Earth Engine para reducir viajes de red.
 - Los resultados y miniaturas se almacenan temporalmente en caché.
 - La finca es la opción inicial; el análisis de toda la cuenca puede tardar más.
 
