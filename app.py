@@ -1,3 +1,4 @@
+import html as html_lib
 import json
 import re
 from datetime import date
@@ -75,6 +76,15 @@ st.markdown(
         border: 1px solid rgba(0,0,0,.35);
         flex: 0 0 1.05rem;
     }
+    .leyenda-texto {flex: 0 1 auto;}
+    .leyenda-info {
+        color: #2f6338;
+        cursor: help;
+        font-size: 1rem;
+        font-weight: 700;
+        line-height: 1;
+        margin-left: -.2rem;
+    }
     .resultado-fuente {
         padding: .7rem .85rem;
         border: 1px solid rgba(128,128,128,.25);
@@ -103,7 +113,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "1.2.5"
+APP_VERSION = "1.2.6"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
 ASSET_CUENCA = (
@@ -283,11 +293,15 @@ LEYENDAS = {
         ("#1B5E20", "Aumento fuerte"),
     ],
     "Vegetación NDVI": [
-        ("#B30000", "Sin vegetación activa"),
-        ("#F4A582", "Suelo/cobertura muy escasa"),
-        ("#FFFFBF", "Vegetación escasa"),
-        ("#78C679", "Vegetación moderada"),
-        ("#006837", "Vegetación densa"),
+        ("#B30000", "Sin vegetación activa", "NDVI menor que 0."),
+        (
+            "#F4A582",
+            "Suelo/cobertura muy escasa",
+            "NDVI de 0.0 a menos de 0.2.",
+        ),
+        ("#FFFFBF", "Vegetación escasa", "NDVI de 0.2 a menos de 0.4."),
+        ("#78C679", "Vegetación moderada", "NDVI de 0.4 a menos de 0.6."),
+        ("#006837", "Vegetación densa", "NDVI mayor o igual que 0.6."),
     ],
 }
 
@@ -899,7 +913,7 @@ def generar_mapas_reporte(
                 VIS_NDVI_CLASES,
                 area_fc,
             ),
-            "Rojo: sin vegetación activa | Amarillo: vegetación escasa | Verde: vegetación moderada a densa",
+            "Rojo: NDVI inferior a 0, sin vegetación activa | Rosado: NDVI 0.0 a menos de 0.2, suelo o cobertura muy escasa | Amarillo: NDVI 0.2 a menos de 0.4, vegetación escasa | Verde claro: NDVI 0.4 a menos de 0.6, vegetación moderada | Verde oscuro: NDVI mayor o igual a 0.6, vegetación densa",
         ),
     ]
 
@@ -1363,12 +1377,24 @@ def generar_pdf(
 
 def mostrar_leyenda(titulo, elementos):
     st.markdown(f"**{titulo}**")
-    html = "".join(
-        f'<div class="leyenda-fila"><span class="leyenda-color" '
-        f'style="background:{color};"></span><span>{texto}</span></div>'
-        for color, texto in elementos
-    )
-    st.markdown(html, unsafe_allow_html=True)
+    filas = []
+    for elemento in elementos:
+        color, texto = elemento[:2]
+        explicacion = elemento[2] if len(elemento) > 2 else None
+        icono_info = ""
+        if explicacion:
+            ayuda = html_lib.escape(explicacion, quote=True)
+            icono_info = (
+                f'<span class="leyenda-info" title="{ayuda}" '
+                f'aria-label="{ayuda}">ⓘ</span>'
+            )
+        filas.append(
+            f'<div class="leyenda-fila"><span class="leyenda-color" '
+            f'style="background:{color};"></span>'
+            f'<span class="leyenda-texto">{html_lib.escape(texto)}</span>'
+            f'{icono_info}</div>'
+        )
+    st.markdown("".join(filas), unsafe_allow_html=True)
 
 
 def mostrar_resultados(
