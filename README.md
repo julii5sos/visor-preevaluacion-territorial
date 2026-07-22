@@ -5,6 +5,11 @@ generar una ficha PDF con resultados y mapas temáticos. Es una herramienta de a
 no constituye una certificación, una validación de campo ni una determinación de
 cumplimiento EUDR.
 
+## Versión actual
+
+La versión principal de la nueva experiencia es **v0.1.3**. El historial completo
+de mejoras y correcciones está disponible en [CHANGELOG.md](CHANGELOG.md).
+
 ## Flujo para el usuario
 
 1. Seleccionar una finca, dibujar un polígono o, para un resumen regional, toda la cuenca.
