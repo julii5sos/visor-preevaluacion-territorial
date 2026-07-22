@@ -48,7 +48,7 @@ st.markdown(
     }
     .stApp {background: var(--institucional-fondo); color: var(--institucional-tinta);}
     html {color-scheme: light;}
-    .block-container {padding-top: 1rem; padding-bottom: 2.5rem; max-width: 1440px;}
+    .block-container {padding-top: 4rem; padding-bottom: 2.5rem; max-width: 1440px;}
     [data-testid="stMetricValue"] {font-size: 1.55rem; color: var(--institucional-tinta);}
     [data-testid="stSidebar"] {border-right: 1px solid var(--institucional-borde);}
     [data-testid="stSidebar"] > div:first-child {background: #ffffff;}
@@ -63,7 +63,7 @@ st.markdown(
         outline-offset: 2px;
     }
     .cabecera-app {
-        padding: 1.15rem 1.35rem 1.2rem;
+        padding: 1.45rem 1.6rem 1.5rem;
         border: 1px solid var(--institucional-borde);
         border-left: 6px solid var(--institucional-verde);
         border-radius: .2rem;
@@ -71,9 +71,22 @@ st.markdown(
         color: var(--institucional-tinta);
         margin-bottom: .8rem;
     }
-    .cabecera-app .marca {font-size: .75rem; letter-spacing: .12em; font-weight: 700; color: var(--institucional-verde);}
-    .cabecera-app h1 {margin: .25rem 0 0; font-size: 2rem; line-height: 1.15; color: var(--institucional-tinta);}
-    .cabecera-app p {margin: .5rem 0 0; color: var(--institucional-suave); max-width: 980px;}
+    .cabecera-app h1 {
+        margin: 0;
+        font-size: clamp(2.15rem, 4vw, 3.35rem);
+        line-height: 1.12;
+        letter-spacing: -.025em;
+        color: var(--institucional-verde);
+        overflow-wrap: normal;
+    }
+    .cabecera-app .subtitulo-app {
+        margin-top: .45rem;
+        font-size: 1.2rem;
+        line-height: 1.35;
+        font-weight: 650;
+        color: var(--institucional-tinta);
+    }
+    .cabecera-app p {margin: .65rem 0 0; color: var(--institucional-suave); max-width: 980px;}
     .alcance-app {margin-top: .65rem; font-size: .86rem; color: var(--institucional-suave);}
     .flujo-pasos {
         display: grid;
@@ -161,7 +174,9 @@ st.markdown(
     .comparador-anios span:last-child {text-align: right;}
     @media (max-width: 760px) {
         .flujo-pasos, .contexto-analisis {grid-template-columns: 1fr 1fr;}
-        .cabecera-app h1 {font-size: 1.55rem;}
+        .block-container {padding-top: 3.5rem;}
+        .cabecera-app {padding: 1.2rem;}
+        .cabecera-app h1 {font-size: 2rem; line-height: 1.15;}
     }
     @media (max-width: 480px) {
         .flujo-pasos, .contexto-analisis {grid-template-columns: 1fr;}
@@ -184,7 +199,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "UX-0.1.0"
+APP_VERSION = "UX-0.1.1"
 METHODOLOGY_VERSION = "MT-2026.1"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
@@ -1732,8 +1747,8 @@ def mostrar_resultados(
 st.markdown(
     """
     <div class="cabecera-app">
-      <div class="marca">PREEVALUACIÓN TERRITORIAL</div>
-      <h1>Análisis territorial guiado</h1>
+      <h1>PREEVALUACIÓN TERRITORIAL</h1>
+      <div class="subtitulo-app">Análisis territorial guiado</div>
       <p>Integra evidencia satelital para reconocer señales de cambio y organizar una revisión
       posterior. El recorrido está diseñado para personas con o sin experiencia en información
       geográfica.</p>
@@ -1748,10 +1763,6 @@ st.markdown(
     </div>
     """,
     unsafe_allow_html=True,
-)
-st.caption(
-    f"Aplicación {APP_VERSION} · Metodología {METHODOLOGY_VERSION} · "
-    "Parámetros y fuentes documentados en cada análisis"
 )
 
 with st.expander("Antes de comenzar: qué hace y qué no hace esta herramienta", expanded=False):
