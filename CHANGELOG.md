@@ -4,7 +4,23 @@ Este historial documenta la evolución de la aplicación UX. Las versiones sigue
 el formato `MAJOR.MINOR.PATCH`: una versión principal, mejoras compatibles y
 correcciones compatibles, respectivamente.
 
-## [0.1.5] - 2026-07-22 — versión actual
+## [0.1.6] - 2026-07-22 — versión actual
+
+### Añadido
+
+- Acceso mediante código privado antes de consultar o mostrar la lista de fincas.
+- Caducidad de la autorización a los 30 minutos, cierre manual y bloqueo temporal
+  después de cinco intentos incorrectos.
+
+### Seguridad
+
+- La dirección del asset de fincas se trasladó a los secretos de Streamlit.
+- El mapa dejó de solicitar y mostrar la colección completa de fincas; conserva
+  únicamente el contorno del área seleccionada.
+- El registro metodológico JSON ya no contiene la dirección del asset ni la
+  geometría vectorial de las fincas privadas.
+
+## [0.1.5] - 2026-07-22
 
 ### Corregido
 
@@ -81,6 +97,7 @@ correcciones compatibles, respectivamente.
 - El alcance indicativo: la aplicación no constituye validación de campo ni
   determina cumplimiento EUDR.
 
+[0.1.6]: https://github.com/julii5sos/visor-preevaluacion-territorial/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/julii5sos/visor-preevaluacion-territorial/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/julii5sos/visor-preevaluacion-territorial/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/julii5sos/visor-preevaluacion-territorial/compare/v0.1.2...v0.1.3

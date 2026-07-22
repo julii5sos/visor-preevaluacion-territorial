@@ -7,7 +7,7 @@ cumplimiento EUDR.
 
 ## Versión actual
 
-La versión principal de la nueva experiencia es **v0.1.5**. El historial completo
+La versión principal de la nueva experiencia es **v0.1.6**. El historial completo
 de mejoras y correcciones está disponible en [CHANGELOG.md](CHANGELOG.md).
 
 ## Flujo para el usuario
@@ -63,6 +63,8 @@ Los secretos se guardan únicamente en **App settings > Secrets**:
 
 ```toml
 EE_PROJECT = "proyecto-de-earth-engine"
+EE_ASSET_FINCAS = "projects/PROYECTO/assets/COLECCION_PRIVADA_DE_FINCAS"
+FINCAS_ACCESS_CODE = "CODIGO_PRIVADO_DE_AL_MENOS_8_CARACTERES"
 
 EE_SERVICE_ACCOUNT_JSON = '''
 {
@@ -74,7 +76,18 @@ EE_SERVICE_ACCOUNT_JSON = '''
 '''
 ```
 
-Nunca se debe guardar el archivo JSON real en el repositorio.
+Nunca se debe guardar el archivo JSON real, la dirección verdadera del asset de
+fincas ni el código de acceso en el repositorio.
+
+### Protección de las fincas
+
+- La lista de fincas solo se consulta después de ingresar el código autorizado.
+- La autorización caduca después de 30 minutos y puede cerrarse manualmente.
+- Cinco intentos incorrectos bloquean temporalmente el acceso.
+- El mapa muestra únicamente la finca seleccionada, no la colección completa.
+- El registro JSON no contiene la ruta del asset ni la geometría vectorial de la finca.
+- La colección de Earth Engine debe permanecer privada y compartirse únicamente con
+  la cuenta de servicio utilizada por la aplicación.
 
 ## Rendimiento
 
@@ -108,7 +121,8 @@ Para desplegarla como una aplicación independiente en Streamlit Community Cloud
 - repositorio: `julii5sos/visor-preevaluacion-territorial`;
 - rama: `codex/app-ux-cientifica`;
 - archivo principal: `app_experiencia.py`;
-- los mismos secretos `EE_PROJECT` y `EE_SERVICE_ACCOUNT_JSON` de la aplicación actual.
+- los secretos `EE_PROJECT`, `EE_SERVICE_ACCOUNT_JSON`, `EE_ASSET_FINCAS` y
+  `FINCAS_ACCESS_CODE` configurados en la aplicación.
 
 La aplicación existente continúa utilizando `app.py` y no se modifica al crear el
 nuevo despliegue.

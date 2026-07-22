@@ -1,6 +1,8 @@
 import html as html_lib
+import hmac
 import json
 import re
+import time
 from datetime import date
 from io import BytesIO
 
@@ -113,17 +115,17 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "1.2.6"
+APP_VERSION = "1.2.7"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
 ASSET_CUENCA = (
     "projects/ee-julissaguevaravega/assets/"
     "CuencasHidrograficadeInteres"
 )
-ASSET_FINCAS = (
-    "projects/ee-julissaguevaravega/assets/"
-    "FincasTrinidadv1"
-)
+ASSET_FINCAS = st.secrets.get("EE_ASSET_FINCAS")
+ACCESO_FINCA_DURACION_SEG = 30 * 60
+ACCESO_FINCA_MAX_INTENTOS = 5
+ACCESO_FINCA_BLOQUEO_SEG = 60
 HANSEN_ASSET = "UMD/hansen/global_forest_change_2025_v1_13"
 TMF_ASSET = "projects/JRC/TMF/v1_2025/AnnualChanges"
 ESRI_ASSET = (
@@ -332,6 +334,105 @@ def iniciar_earth_engine():
     return True
 
 
+def acceso_fincas_vigente():
+    return time.time() < float(st.session_state.get("fincas_acceso_hasta", 0))
+
+
+def cerrar_acceso_fincas():
+    st.session_state.pop("fincas_acceso_hasta", None)
+    st.session_state.pop("codigo_acceso_fincas", None)
+    st.session_state.pop("mensaje_acceso_fincas", None)
+
+
+def procesar_codigo_acceso_fincas():
+    ahora = time.time()
+    codigo_configurado = str(st.secrets.get("FINCAS_ACCESS_CODE", ""))
+    codigo_ingresado = str(st.session_state.get("codigo_acceso_fincas", ""))
+    bloqueo_hasta = float(st.session_state.get("fincas_bloqueo_hasta", 0))
+
+    if ahora < bloqueo_hasta:
+        st.session_state["mensaje_acceso_fincas"] = (
+            "warning",
+            "Acceso temporalmente bloqueado. Espere un minuto antes de volver a intentarlo.",
+        )
+    elif hmac.compare_digest(codigo_ingresado, codigo_configurado):
+        st.session_state["fincas_acceso_hasta"] = ahora + ACCESO_FINCA_DURACION_SEG
+        st.session_state["fincas_intentos_acceso"] = 0
+        st.session_state["mensaje_acceso_fincas"] = (
+            "success",
+            "Acceso autorizado para esta sesión.",
+        )
+    else:
+        intentos = int(st.session_state.get("fincas_intentos_acceso", 0)) + 1
+        if intentos >= ACCESO_FINCA_MAX_INTENTOS:
+            st.session_state["fincas_bloqueo_hasta"] = ahora + ACCESO_FINCA_BLOQUEO_SEG
+            st.session_state["fincas_intentos_acceso"] = 0
+            mensaje = (
+                "warning",
+                "Demasiados intentos. El acceso quedó bloqueado durante un minuto.",
+            )
+        else:
+            st.session_state["fincas_intentos_acceso"] = intentos
+            restantes = ACCESO_FINCA_MAX_INTENTOS - intentos
+            mensaje = (
+                "error",
+                f"Código incorrecto. Quedan {restantes} intentos antes del bloqueo temporal.",
+            )
+        st.session_state["mensaje_acceso_fincas"] = mensaje
+
+    st.session_state["codigo_acceso_fincas"] = ""
+
+
+def solicitar_acceso_fincas():
+    codigo_configurado = str(st.secrets.get("FINCAS_ACCESS_CODE", ""))
+    if not ASSET_FINCAS or len(codigo_configurado) < 8:
+        st.sidebar.error(
+            "El acceso privado a las fincas no está configurado. El administrador debe "
+            "definir EE_ASSET_FINCAS y FINCAS_ACCESS_CODE en los secretos de Streamlit."
+        )
+        return False
+
+    mensaje = st.session_state.pop("mensaje_acceso_fincas", None)
+    if acceso_fincas_vigente():
+        st.sidebar.success("Acceso privado a fincas activo")
+        st.sidebar.caption("La autorización caduca automáticamente después de 30 minutos.")
+        st.sidebar.button(
+            "Cerrar acceso a fincas",
+            on_click=cerrar_acceso_fincas,
+            use_container_width=True,
+        )
+        if mensaje and mensaje[0] == "success":
+            st.sidebar.success(mensaje[1])
+        return True
+
+    bloqueo_hasta = float(st.session_state.get("fincas_bloqueo_hasta", 0))
+    if time.time() < bloqueo_hasta:
+        st.sidebar.warning(
+            "Acceso temporalmente bloqueado. Espere un minuto antes de volver a intentarlo."
+        )
+        return False
+
+    st.sidebar.info(
+        "Esta opción contiene información privada. Ingrese el código autorizado para "
+        "consultar la lista de fincas."
+    )
+    st.sidebar.text_input(
+        "Código de acceso",
+        type="password",
+        key="codigo_acceso_fincas",
+        help="El código no se guarda en GitHub ni se incluye en los informes.",
+    )
+    st.sidebar.button(
+        "Acceder a las fincas",
+        type="primary",
+        on_click=procesar_codigo_acceso_fincas,
+        use_container_width=True,
+    )
+    if mensaje:
+        getattr(st.sidebar, mensaje[0])(mensaje[1])
+    return False
+
+
 def nombre_area_legible(tipo_area, finca_id=None):
     if tipo_area == "Toda la cuenca":
         return "Cuenca hidrográfica de interés"
@@ -352,6 +453,8 @@ def clave_orden_natural(valor):
 
 @st.cache_data(ttl=3600)
 def obtener_ids_fincas():
+    if not ASSET_FINCAS or not acceso_fincas_vigente():
+        raise PermissionError("La colección privada requiere un acceso autorizado.")
     valores = (
         ee.FeatureCollection(ASSET_FINCAS)
         .aggregate_array("FincaID")
@@ -366,6 +469,8 @@ def obtener_ids_fincas():
 
 def obtener_area(tipo_area, finca_id=None, geometria_geojson=None):
     if tipo_area == "Finca de monitoreo":
+        if not ASSET_FINCAS or not acceso_fincas_vigente():
+            raise PermissionError("La finca privada requiere un acceso autorizado.")
         return ee.FeatureCollection(ASSET_FINCAS).filter(
             ee.Filter.eq("FincaID", finca_id)
         )
@@ -1561,6 +1666,12 @@ try:
     geometria_dibujada_json = st.session_state.get("geometria_dibujada_json")
     version_mapa_dibujo = st.session_state.get("version_mapa_dibujo", 0)
     if tipo_area == "Finca de monitoreo":
+        if not solicitar_acceso_fincas():
+            st.info(
+                "El acceso a las fincas está protegido. Ingrese el código en el panel lateral "
+                "o seleccione otra unidad territorial."
+            )
+            st.stop()
         finca_seleccionada = st.sidebar.selectbox(
             "Finca:",
             obtener_ids_fincas(),
@@ -2083,20 +2194,12 @@ try:
         )
 
     cuenca = ee.FeatureCollection(ASSET_CUENCA)
-    fincas = ee.FeatureCollection(ASSET_FINCAS)
     capa_gee(
         mapa,
         cuenca.style(color="FF4444", fillColor="00000000", width=3),
         {},
         "Límite de la cuenca",
     )
-    if tipo_area == "Finca de monitoreo":
-        capa_gee(
-            mapa,
-            fincas.style(color="E040FB", fillColor="00000000", width=2),
-            {},
-            "Fincas de monitoreo",
-        )
     capa_gee(
         mapa,
         area_seleccionada.style(color="00E5FF", fillColor="00E5FF18", width=4),
