@@ -7,8 +7,9 @@ cumplimiento EUDR.
 
 ## Versión actual
 
-La versión principal de la nueva experiencia es **v0.2.0**. El historial completo
-de mejoras y correcciones está disponible en [CHANGELOG.md](CHANGELOG.md).
+La versión principal de la nueva experiencia es **v0.2.1**. El historial completo
+de mejoras y correcciones está disponible en [CHANGELOG.md](CHANGELOG.md), y el
+método reproducible se documenta en [METODOLOGIA.md](METODOLOGIA.md).
 
 ## Flujo para el usuario
 
@@ -45,6 +46,24 @@ El cálculo de superficies se realiza por fuente en su resolución de trabajo: E
 10 m, JRC y Hansen aproximadamente a 30 m, y el producto de altura a su escala de
 análisis. Las fuentes se integran por área; no se interpretan como coincidencias
 píxel a píxel.
+
+## Índice operativo de prioridad
+
+Cada fuente activa su señal mediante umbrales explícitos y puede sumar una sola vez:
+
+| Fuente | Peso máximo | Función en el índice |
+|---|---:|---|
+| JRC Tropical Moist Forest | 2.0 | Evidencia forestal directa de degradación o deforestación |
+| Hansen Global Forest Change | 2.0 | Evidencia independiente de pérdida arbórea posterior a 2020 |
+| ESRI Land Use/Land Cover | 1.5 | Corroboración de la transición árboles → otra cobertura |
+| GEDI | 0.5 | Contexto estructural cuando existe cobertura válida suficiente |
+| Sentinel-2 NDVI | 0.0 | Evidencia visual; no modifica la prioridad |
+
+ESRI no puede aportar más que JRC o Hansen. Además, su señal exige simultáneamente
+un mínimo de 0.10 ha y 5% del área para reducir cambios aislados de clasificación.
+El código centraliza pesos, umbrales, justificaciones y reglas en
+`metodologia_indice.py`; el informe PDF y el registro JSON muestran el aporte
+efectivo de cada fuente.
 
 ## Informe PDF
 
@@ -119,7 +138,7 @@ prototipo en una herramienta validada ni en una determinación de cumplimiento E
 Para desplegarla como una aplicación independiente en Streamlit Community Cloud use:
 
 - repositorio: `julii5sos/visor-preevaluacion-territorial`;
-- rama: `codex/app-ux-cientifica`;
+- rama principal: `main`;
 - archivo principal: `app_experiencia.py`;
 - los secretos `EE_PROJECT`, `EE_SERVICE_ACCOUNT_JSON`, `EE_ASSET_FINCAS` y
   `FINCAS_ACCESS_CODE` configurados en la aplicación.

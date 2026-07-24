@@ -4,7 +4,27 @@ Este historial documenta la evolución de la aplicación UX. Las versiones sigue
 el formato `MAJOR.MINOR.PATCH`: una versión principal, mejoras compatibles y
 correcciones compatibles, respectivamente.
 
-## [0.2.0] - 2026-07-24 — versión actual
+## [0.2.1] - 2026-07-24 — versión actual
+
+### Metodología y trazabilidad
+
+- Se centralizaron pesos, umbrales, justificaciones y reglas de prioridad en
+  `metodologia_indice.py`.
+- El índice suma cada fuente una sola vez: JRC 2.0, Hansen 2.0, ESRI 1.5,
+  GEDI 0.5 y NDVI 0.0.
+- Se añadieron pruebas que demuestran que ESRI no puede superar el aporte
+  individual de JRC ni de Hansen.
+- El registro metodológico JSON incluye la justificación de cada peso y umbral,
+  además del aporte efectivo por fuente.
+
+### Interfaz e informe
+
+- La composición ponderada se muestra antes que las métricas temáticas.
+- JRC, Hansen, ESRI y GEDI reciben una métrica principal cada uno, en ese orden.
+- El PDF incorpora una columna de aporte al índice y la justificación de pesos y
+  umbrales; NDVI queda identificado explícitamente como evidencia visual.
+
+## [0.2.0] - 2026-07-24
 
 ### Mejorado
 
