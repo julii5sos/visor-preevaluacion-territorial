@@ -94,14 +94,71 @@ st.markdown(
     .flujo-pasos {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 1px;
-        margin: 0 0 1rem;
-        border: 1px solid var(--institucional-borde);
-        background: var(--institucional-borde);
+        gap: .55rem;
+        margin: .2rem 0 1.1rem;
     }
-    .flujo-paso {background: #ffffff; padding: .65rem .75rem; font-size: .84rem; color: var(--institucional-suave);}
-    .flujo-paso b {display: block; color: var(--institucional-tinta); font-size: .92rem;}
-    .flujo-numero {color: var(--institucional-verde); font-weight: 700; margin-right: .3rem;}
+    .flujo-paso {
+        position: relative;
+        min-height: 92px;
+        padding: .75rem .8rem .7rem 3.2rem;
+        border: 1px solid var(--institucional-borde);
+        border-radius: .35rem;
+        background: #ffffff;
+        color: var(--institucional-suave);
+        font-size: .84rem;
+        line-height: 1.4;
+    }
+    .flujo-paso b {
+        display: block;
+        margin-bottom: .12rem;
+        color: var(--institucional-tinta);
+        font-size: .94rem;
+    }
+    .flujo-numero {
+        position: absolute;
+        top: .72rem;
+        left: .72rem;
+        display: inline-grid;
+        place-items: center;
+        width: 1.9rem;
+        height: 1.9rem;
+        border: 1px solid var(--institucional-borde);
+        border-radius: 50%;
+        background: var(--institucional-fondo);
+        color: var(--institucional-suave);
+        font-weight: 750;
+    }
+    .flujo-paso.completado {
+        border-color: #91aa97;
+        background: #f4f8f4;
+    }
+    .flujo-paso.completado .flujo-numero {
+        border-color: var(--institucional-verde);
+        background: var(--institucional-verde);
+        color: #ffffff;
+    }
+    .flujo-paso.actual {
+        border: 2px solid var(--institucional-verde);
+        background: var(--institucional-verde-claro);
+        box-shadow: 0 3px 10px rgba(33, 75, 50, .09);
+    }
+    .flujo-paso.actual .flujo-numero {
+        border-color: var(--institucional-verde);
+        background: #ffffff;
+        color: var(--institucional-verde);
+    }
+    .flujo-paso.pendiente .flujo-estado {
+        color: var(--institucional-suave);
+    }
+    .flujo-estado {
+        display: block;
+        margin-top: .3rem;
+        color: var(--institucional-verde);
+        font-size: .73rem;
+        font-weight: 700;
+        letter-spacing: .035em;
+        text-transform: uppercase;
+    }
     .paso-guia {
         padding: .75rem .9rem;
         border-left: 4px solid var(--institucional-verde);
@@ -116,6 +173,37 @@ st.markdown(
         background: #ffffff;
         height: 100%;
     }
+    .entregables {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: .65rem;
+        margin: .75rem 0 1rem;
+    }
+    .entregable {
+        min-height: 92px;
+        padding: .75rem .85rem;
+        border: 1px solid var(--institucional-borde);
+        border-radius: .35rem;
+        background: #ffffff;
+    }
+    .entregable small {
+        display: block;
+        margin-bottom: .2rem;
+        color: var(--institucional-verde);
+        font-weight: 750;
+        letter-spacing: .035em;
+        text-transform: uppercase;
+    }
+    .entregable b {
+        display: block;
+        margin-bottom: .18rem;
+        color: var(--institucional-tinta);
+    }
+    .entregable span {
+        color: var(--institucional-suave);
+        font-size: .84rem;
+        line-height: 1.4;
+    }
     .contexto-analisis {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -127,6 +215,91 @@ st.markdown(
     .contexto-item {background: #ffffff; padding: .75rem .85rem; min-height: 72px;}
     .contexto-item small {display: block; color: var(--institucional-suave); margin-bottom: .2rem;}
     .contexto-item strong {color: var(--institucional-tinta);}
+    .lectura-rapida {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: .7rem;
+        margin: .65rem 0 1rem;
+    }
+    .lectura-tarjeta {
+        min-height: 132px;
+        padding: .85rem .95rem;
+        border: 1px solid var(--institucional-borde);
+        border-top: 4px solid var(--institucional-verde);
+        border-radius: .3rem;
+        background: #ffffff;
+    }
+    .lectura-tarjeta small {
+        display: block;
+        margin-bottom: .35rem;
+        color: var(--institucional-suave);
+        font-size: .75rem;
+        font-weight: 750;
+        letter-spacing: .045em;
+        text-transform: uppercase;
+    }
+    .lectura-tarjeta b {
+        display: block;
+        margin-bottom: .28rem;
+        color: var(--institucional-tinta);
+        font-size: 1rem;
+    }
+    .lectura-tarjeta p {
+        margin: 0;
+        color: var(--institucional-suave);
+        font-size: .86rem;
+        line-height: 1.48;
+    }
+    .resultado-prioridad {
+        padding: 1rem 1.1rem;
+        border: 1px solid var(--institucional-borde);
+        border-left: 6px solid var(--prioridad-color);
+        border-radius: .3rem;
+        background: #ffffff;
+        margin: .5rem 0 1rem;
+    }
+    .resultado-prioridad small {
+        display: block;
+        margin-bottom: .2rem;
+        color: var(--institucional-suave);
+        font-size: .76rem;
+        font-weight: 700;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+    }
+    .resultado-prioridad strong {
+        display: block;
+        color: var(--prioridad-color);
+        font-size: 1.35rem;
+        line-height: 1.25;
+    }
+    .resultado-prioridad p {
+        margin: .45rem 0 0;
+        color: var(--institucional-tinta);
+        line-height: 1.5;
+    }
+    .recuperacion-error {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: .65rem;
+        margin: .7rem 0 1rem;
+    }
+    .recuperacion-paso {
+        padding: .8rem .9rem;
+        border: 1px solid #dfb8b3;
+        border-radius: .35rem;
+        background: #fffafa;
+    }
+    .recuperacion-paso b {
+        display: block;
+        margin-bottom: .22rem;
+        color: #8f2921;
+    }
+    .recuperacion-paso span {
+        color: #5c4946;
+        font-size: .85rem;
+        line-height: 1.45;
+    }
     .bloque-metodo {
         border: 1px solid var(--institucional-borde);
         border-radius: .2rem;
@@ -226,13 +399,16 @@ st.markdown(
     }
     .comparador-anios span:last-child {text-align: right;}
     @media (max-width: 760px) {
-        .flujo-pasos, .contexto-analisis {grid-template-columns: 1fr 1fr;}
+        .flujo-pasos, .contexto-analisis, .entregables,
+        .lectura-rapida, .recuperacion-error {grid-template-columns: 1fr 1fr;}
         .block-container {padding-top: 3.5rem;}
         .cabecera-app {padding: 1.2rem;}
         .cabecera-app h1 {font-size: 2rem; line-height: 1.15;}
     }
     @media (max-width: 480px) {
-        .flujo-pasos, .contexto-analisis {grid-template-columns: 1fr;}
+        .flujo-pasos, .contexto-analisis, .entregables,
+        .lectura-rapida, .recuperacion-error {grid-template-columns: 1fr;}
+        .flujo-paso {min-height: 82px;}
     }
     @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after {
@@ -252,7 +428,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "UX-0.1.7"
+APP_VERSION = "UX-0.2.0"
 METHODOLOGY_VERSION = "MT-2026.1"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
@@ -1823,6 +1999,107 @@ def generar_pdf(
 # Presentación de leyendas y resultados
 # -----------------------------------------------------------------------------
 
+def mostrar_flujo(paso_actual, contenedor=None):
+    pasos = [
+        ("Área", "Seleccione la unidad territorial."),
+        ("Enfoque", "Elija qué desea revisar."),
+        ("Resultados", "Ejecute y lea las señales."),
+        ("Evidencia", "Explore mapas y descargue."),
+    ]
+    tarjetas = []
+    for numero, (titulo, descripcion) in enumerate(pasos, start=1):
+        if numero < paso_actual:
+            estado = "completado"
+            texto_estado = "Completado"
+        elif numero == paso_actual:
+            estado = "actual"
+            texto_estado = "Paso actual"
+        else:
+            estado = "pendiente"
+            texto_estado = "Pendiente"
+        aria_actual = ' aria-current="step"' if numero == paso_actual else ""
+        tarjetas.append(
+            f'<div class="flujo-paso {estado}"{aria_actual}>'
+            f'<span class="flujo-numero">{numero}</span>'
+            f"<b>{html_lib.escape(titulo)}</b>"
+            f"{html_lib.escape(descripcion)}"
+            f'<span class="flujo-estado">{texto_estado}</span>'
+            f"</div>"
+        )
+    destino = contenedor if contenedor is not None else st
+    destino.markdown(
+        '<div class="flujo-pasos" aria-label="Progreso del análisis">'
+        + "".join(tarjetas)
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def mostrar_entregables(contenedor=None):
+    destino = contenedor if contenedor is not None else st
+    destino.markdown(
+        """
+        <div class="entregables" aria-label="Contenido que entregará el análisis">
+          <div class="entregable">
+            <small>Primero</small>
+            <b>Una conclusión resumida</b>
+            <span>Indica la prioridad de revisión y explica qué significa en lenguaje sencillo.</span>
+          </div>
+          <div class="entregable">
+            <small>Después</small>
+            <b>La evidencia en el mapa</b>
+            <span>Permite ubicar visualmente las señales y comparar los períodos disponibles.</span>
+          </div>
+          <div class="entregable">
+            <small>Al finalizar</small>
+            <b>Un informe trazable</b>
+            <span>Reúne resultados, mapas, fuentes y parámetros para documentar la revisión.</span>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def mostrar_error_amigable(error):
+    if isinstance(error, json.JSONDecodeError):
+        explicacion = (
+            "La conexión segura con los datos necesita ser corregida por el administrador. "
+            "El problema no está relacionado con el área que intentó analizar."
+        )
+    elif "permission" in str(error).lower():
+        explicacion = (
+            "La aplicación no tiene autorización para consultar una de las fuentes de datos. "
+            "El administrador debe revisar los permisos de Earth Engine."
+        )
+    else:
+        explicacion = (
+            "La aplicación no pudo completar la conexión inicial con las fuentes territoriales. "
+            "Sus datos y selecciones no causaron este problema."
+        )
+    st.error("El visor no pudo iniciar el análisis territorial.")
+    st.markdown(f"**Qué ocurrió:** {explicacion}")
+    st.markdown(
+        """
+        <div class="recuperacion-error" aria-label="Cómo continuar">
+          <div class="recuperacion-paso">
+            <b>1. Intente nuevamente</b>
+            <span>Recargue la página una vez para descartar una interrupción temporal.</span>
+          </div>
+          <div class="recuperacion-paso">
+            <b>2. Avise al administrador</b>
+            <span>Si continúa, indique que el visor no logró conectarse con Earth Engine.</span>
+          </div>
+          <div class="recuperacion-paso">
+            <b>3. Comparta el detalle</b>
+            <span>Abra el detalle técnico inferior y envíe únicamente el mensaje de error.</span>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def mostrar_leyenda(titulo, elementos):
     st.markdown(f"**{titulo}**")
     filas = []
@@ -1864,19 +2141,70 @@ def mostrar_resultados(
     prioridad = resultados["prioridad"]
     color = {
         "Alta": "#b71c1c",
-        "Media": "#e65100",
-        "Preventiva": "#f9a825",
+        "Media": "#a33a00",
+        "Preventiva": "#8a5b00",
         "Baja": "#2e7d32",
     }[prioridad]
+    fuentes_principales = sum(
+        bool(resultados[clave])
+        for clave in ("senal_tmf", "senal_esri", "senal_hansen")
+    )
+    if fuentes_principales == 0:
+        titulo_hallazgo = "Sin señales principales que eleven la prioridad"
+        detalle_hallazgo = (
+            "JRC, ESRI y Hansen no superaron los umbrales operativos definidos para esta área."
+        )
+        titulo_ubicacion = "No hay un sector prioritario confirmado"
+        detalle_ubicacion = (
+            "Aun así, revise el mapa si necesita documentar la condición actual del predio."
+        )
+    elif fuentes_principales == 1:
+        titulo_hallazgo = "Una fuente principal presenta una señal"
+        detalle_hallazgo = (
+            "Conviene contrastarla con los demás mapas y con información del predio antes de interpretarla."
+        )
+        titulo_ubicacion = "Revise primero las zonas resaltadas"
+        detalle_ubicacion = (
+            "El mapa permite ubicar la señal; su color no establece automáticamente la causa del cambio."
+        )
+    else:
+        titulo_hallazgo = f"{fuentes_principales} fuentes principales presentan señales"
+        detalle_hallazgo = (
+            "La necesidad de revisión aumenta, aunque las fuentes no deben interpretarse como coincidencia píxel a píxel."
+        )
+        titulo_ubicacion = "Priorice los sectores señalados en varios mapas"
+        detalle_ubicacion = (
+            "Compare la ubicación visual y luego confróntela con imágenes recientes y documentos del predio."
+        )
     st.markdown(
         f"""
-        <div style="background:#ffffff; color:#1f2923; padding:1rem 1.2rem;
-                    border:1px solid #cbd5ce; border-left:6px solid {color};
-                    border-radius:.2rem; margin:.5rem 0 1rem 0;">
-          <div style="font-size:.78rem; letter-spacing:.08em; color:#667269;">RESULTADO INTEGRADO</div>
-          <div style="font-size:1.25rem; font-weight:700; color:{color};">PRIORIDAD {prioridad.upper()} DE REVISIÓN</div>
-          <div>Índice operativo: {resultados['puntaje']:.1f}/6.0</div>
-          <div style="margin-top:.35rem;">{texto_recomendacion(prioridad)}</div>
+        <div class="resultado-prioridad" style="--prioridad-color:{color};">
+          <small>Resultado integrado · índice operativo {resultados['puntaje']:.1f}/6.0</small>
+          <strong>Prioridad {prioridad.lower()} de revisión</strong>
+          <p>{html_lib.escape(texto_recomendacion(prioridad))}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown("### Lectura rápida")
+    st.markdown(
+        f"""
+        <div class="lectura-rapida" aria-label="Interpretación resumida del resultado">
+          <div class="lectura-tarjeta">
+            <small>Qué se detectó</small>
+            <b>{html_lib.escape(titulo_hallazgo)}</b>
+            <p>{html_lib.escape(detalle_hallazgo)}</p>
+          </div>
+          <div class="lectura-tarjeta">
+            <small>Dónde mirar</small>
+            <b>{html_lib.escape(titulo_ubicacion)}</b>
+            <p>{html_lib.escape(detalle_ubicacion)}</p>
+          </div>
+          <div class="lectura-tarjeta">
+            <small>Qué hacer después</small>
+            <b>Documente la revisión</b>
+            <p>{html_lib.escape(texto_recomendacion(prioridad))}</p>
+          </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1994,12 +2322,6 @@ st.markdown(
       <div class="alcance-app">Resultado indicativo · requiere interpretación documental y
       verificación de campo · no determina cumplimiento EUDR</div>
     </div>
-    <div class="flujo-pasos" aria-label="Etapas del análisis">
-      <div class="flujo-paso"><b><span class="flujo-numero">1</span>Área</b>Seleccione la unidad territorial.</div>
-      <div class="flujo-paso"><b><span class="flujo-numero">2</span>Enfoque</b>Elija qué desea revisar.</div>
-      <div class="flujo-paso"><b><span class="flujo-numero">3</span>Resultados</b>Ejecute y lea las señales.</div>
-      <div class="flujo-paso"><b><span class="flujo-numero">4</span>Evidencia</b>Explore mapas y descargue.</div>
-    </div>
     """,
     unsafe_allow_html=True,
 )
@@ -2022,11 +2344,29 @@ try:
 
     st.sidebar.markdown("## Configurar análisis")
     st.sidebar.caption("Paso 1 de 2 · Seleccione la unidad territorial")
+    etiquetas_area = {
+        "Finca de monitoreo": "Finca registrada (recomendado)",
+        "Dibujar polígono en el mapa": "Dibujar un área en el mapa",
+        "Toda la cuenca": "Toda la cuenca (análisis regional)",
+    }
+    descripciones_area = {
+        "Finca de monitoreo": (
+            "Opción más rápida. Seleccione una finca disponible después de autorizar el acceso."
+        ),
+        "Dibujar polígono en el mapa": (
+            "Úsela cuando el área no aparece en la lista. El dibujo se limita automáticamente a la cuenca."
+        ),
+        "Toda la cuenca": (
+            "Evalúa la región completa. Requiere más tiempo y es menos detallada para decisiones prediales."
+        ),
+    }
     tipo_area = st.sidebar.radio(
         "¿Qué área desea analizar?",
         ["Finca de monitoreo", "Dibujar polígono en el mapa", "Toda la cuenca"],
+        format_func=lambda valor: etiquetas_area[valor],
         help="Se recomienda iniciar con una finca. El análisis de toda la cuenca puede tardar varios minutos.",
     )
+    st.sidebar.caption(descripciones_area[tipo_area])
     finca_seleccionada = None
     geometria_dibujada_json = st.session_state.get("geometria_dibujada_json")
     version_mapa_dibujo = st.session_state.get("version_mapa_dibujo", 0)
@@ -2257,6 +2597,18 @@ try:
                 f"ESRI {ANO_ESRI_MIN}-{ANO_ESRI_MAX} y NDVI 2022-{ANO_NDVI_MAX}."
             )
 
+    firma_actual = (
+        tipo_area,
+        finca_seleccionada,
+        ANO_DIAG_TMF,
+        anio_esri_inicial,
+        anio_esri_final,
+        anio_ndvi_inicial,
+        geometria_dibujada_json,
+    )
+    analisis_actual = st.session_state.get("firma_analisis") == firma_actual
+    flujo_contenedor = st.empty()
+
     st.markdown("### Selección actual")
     st.markdown(
         f"""
@@ -2304,15 +2656,9 @@ try:
         "se preparará después, solo si usted lo solicita. "
         f"JRC TMF {ANO_DIAG_TMF} permanece fijo para comparar todas las áreas con el mismo criterio."
     )
-    firma_actual = (
-        tipo_area,
-        finca_seleccionada,
-        ANO_DIAG_TMF,
-        anio_esri_inicial,
-        anio_esri_final,
-        anio_ndvi_inicial,
-        geometria_dibujada_json,
-    )
+    entregables_contenedor = st.empty()
+    if not analisis_actual:
+        mostrar_entregables(entregables_contenedor)
     if st.button(
         "Ejecutar análisis",
         type="primary",
@@ -2337,6 +2683,11 @@ try:
                 st.session_state.pop("errores_mapas", None)
                 st.session_state.pop("intento_informe", None)
                 st.session_state.pop("mapas_reporte", None)
+
+    analisis_actual = st.session_state.get("firma_analisis") == firma_actual
+    mostrar_flujo(4 if analisis_actual else 3, flujo_contenedor)
+    if analisis_actual:
+        entregables_contenedor.empty()
 
     if st.session_state.get("firma_analisis") == firma_actual:
         resultados = st.session_state["resultados_analisis"]
@@ -2818,6 +3169,7 @@ try:
             )
 
 except Exception as error:
-    st.error("No fue posible cargar el visor territorial.")
+    mostrar_flujo(1)
+    mostrar_error_amigable(error)
     with st.expander("Detalle técnico para soporte", expanded=False):
         st.code(f"{type(error).__name__}: {error}")

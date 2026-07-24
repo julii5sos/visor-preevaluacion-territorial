@@ -4,7 +4,32 @@ Este historial documenta la evolución de la aplicación UX. Las versiones sigue
 el formato `MAJOR.MINOR.PATCH`: una versión principal, mejoras compatibles y
 correcciones compatibles, respectivamente.
 
-## [0.1.7] - 2026-07-24 — versión actual
+## [0.2.0] - 2026-07-24 — versión actual
+
+### Mejorado
+
+- El recorrido muestra visualmente qué etapas están completadas, cuál es el paso
+  actual y qué falta por hacer.
+- Las opciones de área utilizan nombres cotidianos y explican cuándo conviene usar
+  una finca, dibujar un polígono o analizar la cuenca completa.
+- Antes de ejecutar se anticipan los tres productos que recibirá el usuario:
+  conclusión resumida, evidencia cartográfica e informe trazable.
+- El resultado incorpora una lectura rápida organizada en tres preguntas:
+  qué se detectó, dónde mirar y qué hacer después.
+
+### Accesibilidad y recuperación
+
+- Las tarjetas se reorganizan en una sola columna en pantallas pequeñas y no
+  dependen del color para comunicar el estado.
+- Los errores de conexión incluyen una explicación comprensible y tres pasos de
+  recuperación, conservando el detalle técnico en un panel secundario.
+
+### Metodología
+
+- No se modificaron fuentes, umbrales, pesos, reglas de prioridad ni cálculos
+  territoriales.
+
+## [0.1.7] - 2026-07-24
 
 ### Corregido
 
@@ -111,6 +136,7 @@ correcciones compatibles, respectivamente.
 - El alcance indicativo: la aplicación no constituye validación de campo ni
   determina cumplimiento EUDR.
 
+[0.2.0]: https://github.com/julii5sos/visor-preevaluacion-territorial/compare/v0.1.7...v0.2.0
 [0.1.7]: https://github.com/julii5sos/visor-preevaluacion-territorial/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/julii5sos/visor-preevaluacion-territorial/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/julii5sos/visor-preevaluacion-territorial/compare/v0.1.4...v0.1.5
