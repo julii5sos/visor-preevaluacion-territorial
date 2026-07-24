@@ -1,8 +1,10 @@
 import html as html_lib
+import hashlib
 import hmac
 import json
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from io import BytesIO
 
@@ -30,40 +32,280 @@ from streamlit_folium import st_folium
 
 
 st.set_page_config(
-    page_title="Visor de preevaluación territorial",
-    page_icon="🌿",
+    page_title="Preevaluación territorial | Experiencia guiada",
+    page_icon=":material/map:",
     layout="wide",
+    initial_sidebar_state="expanded",
 )
 
 st.markdown(
     """
     <style>
-    .block-container {padding-top: 1.25rem; padding-bottom: 2rem; max-width: 1500px;}
-    [data-testid="stMetricValue"] {font-size: 1.8rem;}
-    [data-testid="stSidebar"] * {overflow-wrap: anywhere;}
-    iframe {max-width: 100% !important;}
-    .cabecera-app {
-        padding: 1.25rem 1.4rem;
-        border-radius: .8rem;
-        background: linear-gradient(135deg, #17351f 0%, #2f6338 100%);
-        color: white;
-        margin-bottom: 1rem;
+    :root {
+        --institucional-verde: #214b32;
+        --institucional-verde-claro: #e8f0e9;
+        --institucional-tinta: #1f2923;
+        --institucional-suave: #667269;
+        --institucional-borde: #cbd5ce;
+        --institucional-fondo: #f5f7f5;
     }
-    .cabecera-app h1 {margin: 0; font-size: 2rem; line-height: 1.15; color: white;}
-    .cabecera-app p {margin: .55rem 0 0; color: #e8f2e7; max-width: 950px;}
+    .stApp {background: var(--institucional-fondo); color: var(--institucional-tinta);}
+    html {color-scheme: light;}
+    .block-container {padding-top: 4rem; padding-bottom: 2.5rem; max-width: 1440px;}
+    [data-testid="stMetricValue"] {font-size: 1.55rem; color: var(--institucional-tinta);}
+    [data-testid="stSidebar"] {border-right: 1px solid var(--institucional-borde);}
+    [data-testid="stSidebar"] > div:first-child {background: #ffffff;}
+    [data-testid="stSidebar"] * {overflow-wrap: anywhere;}
+    #MainMenu, footer {visibility: hidden;}
+    iframe {max-width: 100% !important;}
+    button, [role="button"] {min-height: 44px;}
+    button:focus-visible, [role="button"]:focus-visible,
+    input:focus-visible, select:focus-visible, textarea:focus-visible,
+    .leyenda-info:focus-visible {
+        outline: 3px solid #9b6a08;
+        outline-offset: 2px;
+    }
+    .cabecera-app {
+        padding: 1.45rem 1.6rem 1.5rem;
+        border: 1px solid var(--institucional-borde);
+        border-left: 6px solid var(--institucional-verde);
+        border-radius: .2rem;
+        background: #ffffff;
+        color: var(--institucional-tinta);
+        margin-bottom: .8rem;
+    }
+    .cabecera-app h1 {
+        margin: 0;
+        font-size: clamp(2.15rem, 4vw, 3.35rem);
+        line-height: 1.12;
+        letter-spacing: -.025em;
+        color: var(--institucional-verde);
+        overflow-wrap: normal;
+    }
+    .cabecera-app .subtitulo-app {
+        margin-top: .45rem;
+        font-size: 1.2rem;
+        line-height: 1.35;
+        font-weight: 650;
+        color: var(--institucional-tinta);
+    }
+    .cabecera-app p {margin: .65rem 0 0; color: var(--institucional-suave); max-width: 980px;}
+    .alcance-app {margin-top: .65rem; font-size: .86rem; color: var(--institucional-suave);}
+    .flujo-pasos {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: .55rem;
+        margin: .2rem 0 1.1rem;
+    }
+    .flujo-paso {
+        position: relative;
+        min-height: 92px;
+        padding: .75rem .8rem .7rem 3.2rem;
+        border: 1px solid var(--institucional-borde);
+        border-radius: .35rem;
+        background: #ffffff;
+        color: var(--institucional-suave);
+        font-size: .84rem;
+        line-height: 1.4;
+    }
+    .flujo-paso b {
+        display: block;
+        margin-bottom: .12rem;
+        color: var(--institucional-tinta);
+        font-size: .94rem;
+    }
+    .flujo-numero {
+        position: absolute;
+        top: .72rem;
+        left: .72rem;
+        display: inline-grid;
+        place-items: center;
+        width: 1.9rem;
+        height: 1.9rem;
+        border: 1px solid var(--institucional-borde);
+        border-radius: 50%;
+        background: var(--institucional-fondo);
+        color: var(--institucional-suave);
+        font-weight: 750;
+    }
+    .flujo-paso.completado {
+        border-color: #91aa97;
+        background: #f4f8f4;
+    }
+    .flujo-paso.completado .flujo-numero {
+        border-color: var(--institucional-verde);
+        background: var(--institucional-verde);
+        color: #ffffff;
+    }
+    .flujo-paso.actual {
+        border: 2px solid var(--institucional-verde);
+        background: var(--institucional-verde-claro);
+        box-shadow: 0 3px 10px rgba(33, 75, 50, .09);
+    }
+    .flujo-paso.actual .flujo-numero {
+        border-color: var(--institucional-verde);
+        background: #ffffff;
+        color: var(--institucional-verde);
+    }
+    .flujo-paso.pendiente .flujo-estado {
+        color: var(--institucional-suave);
+    }
+    .flujo-estado {
+        display: block;
+        margin-top: .3rem;
+        color: var(--institucional-verde);
+        font-size: .73rem;
+        font-weight: 700;
+        letter-spacing: .035em;
+        text-transform: uppercase;
+    }
     .paso-guia {
         padding: .75rem .9rem;
-        border-left: 4px solid #3f7d44;
-        background: #f4f8f2;
-        border-radius: 0 .5rem .5rem 0;
+        border-left: 4px solid var(--institucional-verde);
+        background: var(--institucional-verde-claro);
+        border-radius: 0 .2rem .2rem 0;
         margin: .35rem 0 .85rem;
     }
     .tarjeta-resumen {
-        border: 1px solid rgba(47,99,56,.25);
-        border-radius: .65rem;
+        border: 1px solid var(--institucional-borde);
+        border-radius: .2rem;
         padding: .85rem 1rem;
-        background: #fbfdf9;
+        background: #ffffff;
         height: 100%;
+    }
+    .entregables {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: .65rem;
+        margin: .75rem 0 1rem;
+    }
+    .entregable {
+        min-height: 92px;
+        padding: .75rem .85rem;
+        border: 1px solid var(--institucional-borde);
+        border-radius: .35rem;
+        background: #ffffff;
+    }
+    .entregable small {
+        display: block;
+        margin-bottom: .2rem;
+        color: var(--institucional-verde);
+        font-weight: 750;
+        letter-spacing: .035em;
+        text-transform: uppercase;
+    }
+    .entregable b {
+        display: block;
+        margin-bottom: .18rem;
+        color: var(--institucional-tinta);
+    }
+    .entregable span {
+        color: var(--institucional-suave);
+        font-size: .84rem;
+        line-height: 1.4;
+    }
+    .contexto-analisis {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1px;
+        margin: .3rem 0 1rem;
+        border: 1px solid var(--institucional-borde);
+        background: var(--institucional-borde);
+    }
+    .contexto-item {background: #ffffff; padding: .75rem .85rem; min-height: 72px;}
+    .contexto-item small {display: block; color: var(--institucional-suave); margin-bottom: .2rem;}
+    .contexto-item strong {color: var(--institucional-tinta);}
+    .lectura-rapida {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: .7rem;
+        margin: .65rem 0 1rem;
+    }
+    .lectura-tarjeta {
+        min-height: 132px;
+        padding: .85rem .95rem;
+        border: 1px solid var(--institucional-borde);
+        border-top: 4px solid var(--institucional-verde);
+        border-radius: .3rem;
+        background: #ffffff;
+    }
+    .lectura-tarjeta small {
+        display: block;
+        margin-bottom: .35rem;
+        color: var(--institucional-suave);
+        font-size: .75rem;
+        font-weight: 750;
+        letter-spacing: .045em;
+        text-transform: uppercase;
+    }
+    .lectura-tarjeta b {
+        display: block;
+        margin-bottom: .28rem;
+        color: var(--institucional-tinta);
+        font-size: 1rem;
+    }
+    .lectura-tarjeta p {
+        margin: 0;
+        color: var(--institucional-suave);
+        font-size: .86rem;
+        line-height: 1.48;
+    }
+    .resultado-prioridad {
+        padding: 1rem 1.1rem;
+        border: 1px solid var(--institucional-borde);
+        border-left: 6px solid var(--prioridad-color);
+        border-radius: .3rem;
+        background: #ffffff;
+        margin: .5rem 0 1rem;
+    }
+    .resultado-prioridad small {
+        display: block;
+        margin-bottom: .2rem;
+        color: var(--institucional-suave);
+        font-size: .76rem;
+        font-weight: 700;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+    }
+    .resultado-prioridad strong {
+        display: block;
+        color: var(--prioridad-color);
+        font-size: 1.35rem;
+        line-height: 1.25;
+    }
+    .resultado-prioridad p {
+        margin: .45rem 0 0;
+        color: var(--institucional-tinta);
+        line-height: 1.5;
+    }
+    .recuperacion-error {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: .65rem;
+        margin: .7rem 0 1rem;
+    }
+    .recuperacion-paso {
+        padding: .8rem .9rem;
+        border: 1px solid #dfb8b3;
+        border-radius: .35rem;
+        background: #fffafa;
+    }
+    .recuperacion-paso b {
+        display: block;
+        margin-bottom: .22rem;
+        color: #8f2921;
+    }
+    .recuperacion-paso span {
+        color: #5c4946;
+        font-size: .85rem;
+        line-height: 1.45;
+    }
+    .bloque-metodo {
+        border: 1px solid var(--institucional-borde);
+        border-radius: .2rem;
+        background: #ffffff;
+        padding: .8rem 1rem;
+        margin: .5rem 0;
     }
     .leyenda-fila {
         display: grid;
@@ -139,8 +381,9 @@ st.markdown(
     }
     .resultado-fuente {
         padding: .7rem .85rem;
-        border: 1px solid rgba(128,128,128,.25);
-        border-radius: .45rem;
+        border: 1px solid var(--institucional-borde);
+        border-radius: .2rem;
+        background: #ffffff;
         margin-bottom: .45rem;
     }
     .comparador-anios {
@@ -150,11 +393,31 @@ st.markdown(
         padding: .65rem .85rem;
         margin: .25rem 0 .55rem;
         border: 1px solid rgba(23,53,31,.28);
-        border-radius: .55rem;
-        background: #f4f8f2;
-        color: #17351f;
+        border-radius: .2rem;
+        background: var(--institucional-verde-claro);
+        color: var(--institucional-verde);
     }
     .comparador-anios span:last-child {text-align: right;}
+    @media (max-width: 760px) {
+        .flujo-pasos, .contexto-analisis, .entregables,
+        .lectura-rapida, .recuperacion-error {grid-template-columns: 1fr 1fr;}
+        .block-container {padding-top: 3.5rem;}
+        .cabecera-app {padding: 1.2rem;}
+        .cabecera-app h1 {font-size: 2rem; line-height: 1.15;}
+    }
+    @media (max-width: 480px) {
+        .flujo-pasos, .contexto-analisis, .entregables,
+        .lectura-rapida, .recuperacion-error {grid-template-columns: 1fr;}
+        .flujo-paso {min-height: 82px;}
+    }
+    @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+            animation-duration: .01ms !important;
+            animation-iteration-count: 1 !important;
+            scroll-behavior: auto !important;
+            transition-duration: .01ms !important;
+        }
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -165,7 +428,8 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "1.2.8"
+APP_VERSION = "UX-0.2.0"
+METHODOLOGY_VERSION = "MT-2026.1"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
 ASSET_CUENCA = (
@@ -202,8 +466,10 @@ UMBRAL_REVISION_TMF_DEFOR_HA = 0.5
 UMBRAL_PCT_TMF_DEFOR = 1.0
 UMBRAL_PCT_TMF_DEGRAD = 5.0
 UMBRAL_PCT_ESRI_SALIDA = 5.0
+UMBRAL_ESRI_SALIDA_HA = 0.10
 UMBRAL_DOSEL_BAJO_M = 8.0
 UMBRAL_COBERTURA_GEDI_PCT = 20.0
+UMBRAL_LINEA_BASE_GEDI_PCT = 10.0
 
 ESRI_ORIG = [1, 2, 4, 5, 7, 8, 9, 10, 11]
 ESRI_VIS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -358,6 +624,134 @@ LEYENDAS = {
 }
 
 
+def construir_registro_metodologico(
+    tipo_area,
+    finca_id,
+    geometria_geojson,
+    anio_esri_inicial,
+    anio_esri_final,
+    anio_ndvi_inicial,
+    resultados=None,
+):
+    if tipo_area == "Finca de monitoreo":
+        especificacion_area = {
+            "tipo": "finca_privada",
+            "identificador": str(finca_id),
+            "geometria_vectorial_incluida": False,
+            "fuente": "coleccion_privada_configurada_en_el_servidor",
+        }
+    elif tipo_area == "Dibujar polígono en el mapa":
+        especificacion_area = {
+            "tipo": "poligono_dibujado",
+            "geojson": json.loads(geometria_geojson),
+            "recorte": ASSET_CUENCA,
+        }
+    else:
+        especificacion_area = {"tipo": "cuenca", "asset": ASSET_CUENCA}
+
+    configuracion = {
+        "metodologia": METHODOLOGY_VERSION,
+        "area": especificacion_area,
+        "periodos": {
+            "jrc_diagnostico": ANO_DIAG_TMF,
+            "esri_inicial": anio_esri_inicial,
+            "esri_final": anio_esri_final,
+            "ndvi_inicial": anio_ndvi_inicial,
+            "ndvi_final": ANO_NDVI_MAX,
+            "corte_referencia": CUTOFF_LABEL,
+        },
+        "fuentes": [
+            {
+                "nombre": "JRC Tropical Moist Forest",
+                "asset": TMF_ASSET,
+                "banda": f"Dec{ANO_DIAG_TMF}",
+                "escala_m": 30,
+                "uso": "diagnostico",
+            },
+            {
+                "nombre": "Hansen Global Forest Change",
+                "asset": HANSEN_ASSET,
+                "bandas": ["treecover2000", "loss", "lossyear"],
+                "escala_m": 30,
+                "uso": "diagnostico",
+            },
+            {
+                "nombre": "ESRI Land Use Land Cover",
+                "asset": ESRI_ASSET,
+                "escala_m": 10,
+                "uso": "diagnostico",
+            },
+            {
+                "nombre": "GEDI Canopy Height",
+                "asset": GEDI_ASSET,
+                "escala_m": 100,
+                "uso": "contexto",
+            },
+            {
+                "nombre": "Sentinel-2 Surface Reflectance Harmonized",
+                "asset": "COPERNICUS/S2_SR_HARMONIZED",
+                "bandas": ["B8", "B4", "SCL"],
+                "escala_m": 10,
+                "uso": "visual; no participa en el indice",
+            },
+        ],
+        "umbrales": {
+            "hansen_post_2020_ha": UMBRAL_ALERTA_HANSEN_HA,
+            "jrc_deforestacion_ha": UMBRAL_REVISION_TMF_DEFOR_HA,
+            "jrc_deforestacion_pct": UMBRAL_PCT_TMF_DEFOR,
+            "jrc_degradacion_ha": UMBRAL_REVISION_TMF_DEGRAD_HA,
+            "jrc_degradacion_pct": UMBRAL_PCT_TMF_DEGRAD,
+            "esri_salida_arboles_ha": UMBRAL_ESRI_SALIDA_HA,
+            "esri_salida_arboles_pct": UMBRAL_PCT_ESRI_SALIDA,
+            "gedi_dosel_bajo_m": UMBRAL_DOSEL_BAJO_M,
+            "gedi_cobertura_minima_pct": UMBRAL_COBERTURA_GEDI_PCT,
+            "gedi_linea_base_minima_pct": UMBRAL_LINEA_BASE_GEDI_PCT,
+        },
+        "pesos": {"jrc": 2.0, "hansen": 2.0, "esri": 1.5, "gedi": 0.5},
+        "reglas_prioridad": {
+            "alta": "puntaje >= 3.0",
+            "media": "puntaje >= 1.5 y < 3.0",
+            "preventiva": "puntaje >= 0.5 y < 1.5",
+            "baja": "puntaje < 0.5",
+        },
+        "procesamiento": {
+            "unidad_area": "hectareas",
+            "reduccion": "suma de area por clase en la proyeccion de cada fuente",
+            "respuesta_earth_engine": "reducciones agrupadas en una sola respuesta",
+            "ndvi": "mediana anual con mascara SCL y respaldo del ano anterior",
+            "formula_ndvi": "(B8 - B4) / (B8 + B4)",
+        },
+    }
+    huella = hashlib.sha256(
+        json.dumps(configuracion, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    ).hexdigest()[:16]
+    registro = {
+        "aplicacion": APP_VERSION,
+        "fecha_generacion": date.today().isoformat(),
+        "codigo_reproducibilidad": huella,
+        "explicacion_codigo": (
+            "Identificador técnico generado a partir del área, las fuentes, los períodos, "
+            "los umbrales, los pesos y las reglas de esta configuración."
+        ),
+        **configuracion,
+        "alcance": (
+            "Preevaluacion indicativa para priorizar revisiones. No constituye validacion "
+            "de campo ni determina cumplimiento EUDR."
+        ),
+    }
+    if resultados:
+        registro["resultados_resumen"] = {
+            "area_ha": resultados["area_ha"],
+            "puntaje": resultados["puntaje"],
+            "prioridad": resultados["prioridad"],
+            "senal_jrc": resultados["senal_tmf"],
+            "senal_hansen": resultados["senal_hansen"],
+            "senal_esri": resultados["senal_esri"],
+            "senal_gedi": resultados["senal_gedi"],
+        }
+    return registro
+
+
 # -----------------------------------------------------------------------------
 # Earth Engine y datos
 # -----------------------------------------------------------------------------
@@ -430,6 +824,7 @@ def procesar_codigo_acceso_fincas():
             )
         st.session_state["mensaje_acceso_fincas"] = mensaje
 
+    # El código digitado no permanece almacenado en la sesión.
     st.session_state["codigo_acceso_fincas"] = ""
 
 
@@ -789,7 +1184,7 @@ def reducir_superficies(imagen, geometria, escala, proyeccion=None):
     }
     if proyeccion is not None:
         parametros["crs"] = proyeccion
-    return imagen.reduceRegion(**parametros).getInfo()
+    return ee.Dictionary(imagen.reduceRegion(**parametros))
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -803,7 +1198,6 @@ def ejecutar_analisis(
 ):
     area_fc = obtener_area(tipo_area, finca_id, geometria_geojson)
     geometria = area_fc.geometry()
-    area_ha = float(geometria.area(1).divide(10000).getInfo())
 
     tmf = obtener_tmf(anio_tmf_diagnostico, geometria)
     esri_inicial = obtener_esri(anio_esri_inicial, geometria)
@@ -838,52 +1232,76 @@ def ejecutar_analisis(
         ]
     )
 
-    resumen_areas = {}
-    resumen_areas.update(
+    # Las reducciones conservan la escala y proyección de cada fuente, pero se
+    # agrupan en una sola respuesta para evitar varios viajes de red consecutivos.
+    resumen = (
         reducir_superficies(areas_tmf, geometria, 30, tmf.projection())
-    )
-    resumen_areas.update(
-        reducir_superficies(
-            areas_hansen,
-            geometria,
-            30,
-            ee.Image(HANSEN_ASSET).projection(),
+        .combine(
+            reducir_superficies(
+                areas_hansen,
+                geometria,
+                30,
+                ee.Image(HANSEN_ASSET).projection(),
+            ),
+            True,
         )
-    )
-    resumen_areas.update(
-        reducir_superficies(
-            areas_esri,
-            geometria,
-            10,
-            esri_final.projection(),
+        .combine(
+            reducir_superficies(
+                areas_esri,
+                geometria,
+                10,
+                esri_final.projection(),
+            ),
+            True,
         )
+        .combine(
+            ee.Dictionary(
+                {
+                    "area_ha": geometria.area(1).divide(10000),
+                    "gedi_altura": gedi.reduceRegion(
+                        reducer=ee.Reducer.mean(),
+                        geometry=geometria,
+                        scale=100,
+                        bestEffort=True,
+                        maxPixels=1e9,
+                        tileScale=4,
+                    ).get("altura_dosel"),
+                    "gedi_area_datos": gedi.mask()
+                    .multiply(pixel_ha)
+                    .reduceRegion(
+                        reducer=ee.Reducer.sum(),
+                        geometry=geometria,
+                        scale=100,
+                        bestEffort=True,
+                        maxPixels=1e9,
+                        tileScale=4,
+                    )
+                    .get("altura_dosel"),
+                }
+            ),
+            True,
+        )
+        .getInfo()
     )
 
-    resumen_gedi = ee.Dictionary(
-        {
-            "altura": gedi.reduceRegion(
-                reducer=ee.Reducer.mean(),
-                geometry=geometria,
-                scale=100,
-                bestEffort=True,
-                maxPixels=1e9,
-                tileScale=4,
-            ).get("altura_dosel"),
-            "area_datos": gedi.mask().multiply(pixel_ha).reduceRegion(
-                reducer=ee.Reducer.sum(),
-                geometry=geometria,
-                scale=100,
-                bestEffort=True,
-                maxPixels=1e9,
-                tileScale=4,
-            ).get("altura_dosel"),
-        }
-    ).getInfo()
-
-    resultados = {clave: numero(resumen_areas, clave) for clave in resumen_areas}
+    claves_areas = [
+        "tmf_estable",
+        "tmf_degradacion",
+        "tmf_deforestacion",
+        "tmf_recuperacion",
+        "hansen_post",
+        "hansen_pre",
+        "linea_base",
+        "esri_arboles_final",
+        "esri_salida",
+        "esri_ganancia",
+        "esri_estable",
+    ]
+    resultados = {clave: numero(resumen, clave) for clave in claves_areas}
+    area_ha = numero(resumen, "area_ha")
     resultados["area_ha"] = area_ha
-    resultados["gedi_altura"] = numero(resumen_gedi, "altura")
-    resultados["gedi_area_datos"] = numero(resumen_gedi, "area_datos")
+    resultados["gedi_altura"] = numero(resumen, "gedi_altura")
+    resultados["gedi_area_datos"] = numero(resumen, "gedi_area_datos")
     resultados["gedi_cobertura_pct"] = (
         resultados["gedi_area_datos"] / area_ha * 100 if area_ha else 0
     )
@@ -901,14 +1319,14 @@ def ejecutar_analisis(
     )
     senal_hansen = resultados["hansen_post"] >= UMBRAL_ALERTA_HANSEN_HA
     senal_esri = (
-        resultados["esri_salida"] >= 0.10
+        resultados["esri_salida"] >= UMBRAL_ESRI_SALIDA_HA
         and pct_esri_salida >= UMBRAL_PCT_ESRI_SALIDA
     )
     gedi_disponible = resultados["gedi_cobertura_pct"] >= UMBRAL_COBERTURA_GEDI_PCT
     senal_gedi = (
         gedi_disponible
         and resultados["gedi_altura"] < UMBRAL_DOSEL_BAJO_M
-        and pct_linea_base >= 10
+        and pct_linea_base >= UMBRAL_LINEA_BASE_GEDI_PCT
     )
 
     puntaje = (
@@ -968,41 +1386,100 @@ def visualizar_con_borde(imagen, visualizacion, area_fc, fondo=None):
     return visual.blend(borde)
 
 
-def descargar_miniatura(imagen, geometria):
-    region = geometria.bounds(1).coordinates().getInfo()
-    intentos_fallidos = []
-    # Una sola dimensión conserva la proporción. Si Earth Engine no logra
-    # renderizar una miniatura, se reintenta con menos píxeles para evitar que
-    # el PDF pierda el mapa completo por un fallo temporal o de recursos.
-    for dimension in (1200, 900, 700):
-        try:
-            url = ee.Image(imagen).getThumbURL(
-                {
-                    "region": region,
-                    "dimensions": dimension,
-                    "format": "png",
-                }
-            )
-            respuesta = requests.get(
-                url,
-                timeout=75,
-                headers={"User-Agent": "visor-preevaluacion-territorial/1.0"},
-            )
-            respuesta.raise_for_status()
-            if (
-                len(respuesta.content) < 1000
-                or not respuesta.content.startswith(b"\x89PNG")
-            ):
-                raise RuntimeError("respuesta PNG no válida")
-            return respuesta.content
-        except Exception as error:
-            # Se registra solo el tipo para no exponer URL o tokens temporales.
-            intentos_fallidos.append(f"{dimension}px: {type(error).__name__}")
-    raise RuntimeError(
-        "Miniatura no disponible después de reintentos ("
-        + ", ".join(intentos_fallidos)
-        + ")."
+def crear_url_miniatura(imagen, region, dimension):
+    """Solicita a Earth Engine una URL temporal sin descargar todavía el PNG."""
+    return ee.Image(imagen).getThumbURL(
+        {
+            "region": region,
+            # Una dimensión conserva la proporción original del territorio.
+            "dimensions": dimension,
+            "format": "png",
+        }
     )
+
+
+def descargar_url_miniatura(url):
+    """Descarga y valida una miniatura ya preparada por Earth Engine."""
+    respuesta = requests.get(
+        url,
+        timeout=(10, 60),
+        headers={"User-Agent": "visor-preevaluacion-territorial/1.0"},
+    )
+    respuesta.raise_for_status()
+    if len(respuesta.content) < 1000 or not respuesta.content.startswith(b"\x89PNG"):
+        raise RuntimeError("respuesta PNG no válida")
+    return respuesta.content
+
+
+def descargar_miniaturas(especificaciones, geometria, mapas_existentes=None):
+    """Descarga los mapas en paralelo y reintenta únicamente los que fallan."""
+    # Antes se consultaban estos límites una vez por cada mapa. Una sola consulta
+    # reduce seis viajes innecesarios a Earth Engine.
+    region = geometria.bounds(1).coordinates().getInfo()
+    existentes_por_titulo = {
+        mapa["titulo"]: mapa
+        for mapa in (mapas_existentes or [])
+        if mapa.get("imagen")
+    }
+    resultados = [
+        existentes_por_titulo.get(titulo)
+        for titulo, _, _ in especificaciones
+    ]
+    pendientes = {
+        indice for indice, resultado in enumerate(resultados) if resultado is None
+    }
+    fallos = {indice: [] for indice in pendientes}
+
+    # 1200 px conserva buena definición para el PDF. El segundo intento a 800 px
+    # reduce el costo solo cuando Earth Engine no logra servir el mapa principal.
+    for dimension in (1200, 800):
+        if not pendientes:
+            break
+
+        urls = {}
+        for indice in list(pendientes):
+            titulo, imagen, _ = especificaciones[indice]
+            try:
+                urls[indice] = crear_url_miniatura(imagen, region, dimension)
+            except Exception as error:
+                fallos[indice].append(
+                    f"{dimension}px al solicitar: {type(error).__name__}"
+                )
+
+        if not urls:
+            continue
+
+        # Tres solicitudes simultáneas acortan la espera sin saturar la cuota de
+        # Earth Engine ni la memoria limitada de Streamlit Community Cloud.
+        trabajadores = min(3, len(urls))
+        with ThreadPoolExecutor(max_workers=trabajadores) as ejecutor:
+            futuros = {
+                ejecutor.submit(descargar_url_miniatura, url): indice
+                for indice, url in urls.items()
+            }
+            for futuro in as_completed(futuros):
+                indice = futuros[futuro]
+                titulo, _, leyenda = especificaciones[indice]
+                try:
+                    resultados[indice] = {
+                        "titulo": titulo,
+                        "imagen": futuro.result(),
+                        "leyenda": leyenda,
+                    }
+                    pendientes.discard(indice)
+                except Exception as error:
+                    # No se registran la URL ni sus tokens temporales.
+                    fallos[indice].append(f"{dimension}px: {type(error).__name__}")
+
+    errores = []
+    for indice in sorted(pendientes):
+        titulo, _, leyenda = especificaciones[indice]
+        resultados[indice] = {"titulo": titulo, "imagen": None, "leyenda": leyenda}
+        errores.append(
+            f"{titulo}: Miniatura no disponible después de reintentos "
+            f"({', '.join(fallos[indice]) or 'sin respuesta'})."
+        )
+    return resultados, errores
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -1014,7 +1491,12 @@ def generar_mapas_reporte(
     anio_esri_final,
     anio_ndvi_inicial,
     geometria_geojson=None,
+    intento_cache=0,
+    _mapas_existentes=None,
 ):
+    # El número de intento forma parte de la clave de caché y permite reintentar
+    # si Earth Engine no entrega alguna miniatura temporalmente.
+    _ = intento_cache
     area_fc = obtener_area(tipo_area, finca_id, geometria_geojson)
     geometria = area_fc.geometry()
     tmf = obtener_tmf(anio_tmf_diagnostico, geometria)
@@ -1072,27 +1554,7 @@ def generar_mapas_reporte(
         ),
     ]
 
-    mapas = []
-    errores = []
-    for titulo, imagen, leyenda in especificaciones:
-        try:
-            mapas.append(
-                {
-                    "titulo": titulo,
-                    "imagen": descargar_miniatura(imagen, geometria),
-                    "leyenda": leyenda,
-                }
-            )
-        except Exception as error:
-            mapas.append({"titulo": titulo, "imagen": None, "leyenda": leyenda})
-            detalle = (
-                str(error)
-                if isinstance(error, RuntimeError)
-                and str(error).startswith("Miniatura no disponible")
-                else type(error).__name__
-            )
-            errores.append(f"{titulo}: {detalle}")
-    return mapas, errores
+    return descargar_miniaturas(especificaciones, geometria, _mapas_existentes)
 
 
 # -----------------------------------------------------------------------------
@@ -1254,6 +1716,13 @@ def generar_pdf(
         [Paragraph("Superficie total", estilos["CuerpoFicha"]), Paragraph(f"{area:,.2f} ha", estilos["CuerpoFicha"])],
         [Paragraph("Fecha del análisis", estilos["CuerpoFicha"]), Paragraph(date.today().strftime("%d/%m/%Y"), estilos["CuerpoFicha"])],
         [Paragraph("Períodos principales", estilos["CuerpoFicha"]), Paragraph(f"JRC diagnóstico {anio_tmf_diagnostico} | ESRI {anio_esri_inicial}-{anio_esri_final} | NDVI {anio_ndvi_inicial}-{ANO_NDVI_MAX}", estilos["CuerpoFicha"])],
+        [
+            Paragraph("Metodología aplicada", estilos["CuerpoFicha"]),
+            Paragraph(
+                METHODOLOGY_VERSION,
+                estilos["CuerpoFicha"],
+            ),
+        ],
     ]
     tabla = Table(datos, colWidths=[4.0 * cm, 12.5 * cm])
     tabla.setStyle(
@@ -1530,6 +1999,107 @@ def generar_pdf(
 # Presentación de leyendas y resultados
 # -----------------------------------------------------------------------------
 
+def mostrar_flujo(paso_actual, contenedor=None):
+    pasos = [
+        ("Área", "Seleccione la unidad territorial."),
+        ("Enfoque", "Elija qué desea revisar."),
+        ("Resultados", "Ejecute y lea las señales."),
+        ("Evidencia", "Explore mapas y descargue."),
+    ]
+    tarjetas = []
+    for numero, (titulo, descripcion) in enumerate(pasos, start=1):
+        if numero < paso_actual:
+            estado = "completado"
+            texto_estado = "Completado"
+        elif numero == paso_actual:
+            estado = "actual"
+            texto_estado = "Paso actual"
+        else:
+            estado = "pendiente"
+            texto_estado = "Pendiente"
+        aria_actual = ' aria-current="step"' if numero == paso_actual else ""
+        tarjetas.append(
+            f'<div class="flujo-paso {estado}"{aria_actual}>'
+            f'<span class="flujo-numero">{numero}</span>'
+            f"<b>{html_lib.escape(titulo)}</b>"
+            f"{html_lib.escape(descripcion)}"
+            f'<span class="flujo-estado">{texto_estado}</span>'
+            f"</div>"
+        )
+    destino = contenedor if contenedor is not None else st
+    destino.markdown(
+        '<div class="flujo-pasos" aria-label="Progreso del análisis">'
+        + "".join(tarjetas)
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def mostrar_entregables(contenedor=None):
+    destino = contenedor if contenedor is not None else st
+    destino.markdown(
+        """
+        <div class="entregables" aria-label="Contenido que entregará el análisis">
+          <div class="entregable">
+            <small>Primero</small>
+            <b>Una conclusión resumida</b>
+            <span>Indica la prioridad de revisión y explica qué significa en lenguaje sencillo.</span>
+          </div>
+          <div class="entregable">
+            <small>Después</small>
+            <b>La evidencia en el mapa</b>
+            <span>Permite ubicar visualmente las señales y comparar los períodos disponibles.</span>
+          </div>
+          <div class="entregable">
+            <small>Al finalizar</small>
+            <b>Un informe trazable</b>
+            <span>Reúne resultados, mapas, fuentes y parámetros para documentar la revisión.</span>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def mostrar_error_amigable(error):
+    if isinstance(error, json.JSONDecodeError):
+        explicacion = (
+            "La conexión segura con los datos necesita ser corregida por el administrador. "
+            "El problema no está relacionado con el área que intentó analizar."
+        )
+    elif "permission" in str(error).lower():
+        explicacion = (
+            "La aplicación no tiene autorización para consultar una de las fuentes de datos. "
+            "El administrador debe revisar los permisos de Earth Engine."
+        )
+    else:
+        explicacion = (
+            "La aplicación no pudo completar la conexión inicial con las fuentes territoriales. "
+            "Sus datos y selecciones no causaron este problema."
+        )
+    st.error("El visor no pudo iniciar el análisis territorial.")
+    st.markdown(f"**Qué ocurrió:** {explicacion}")
+    st.markdown(
+        """
+        <div class="recuperacion-error" aria-label="Cómo continuar">
+          <div class="recuperacion-paso">
+            <b>1. Intente nuevamente</b>
+            <span>Recargue la página una vez para descartar una interrupción temporal.</span>
+          </div>
+          <div class="recuperacion-paso">
+            <b>2. Avise al administrador</b>
+            <span>Si continúa, indique que el visor no logró conectarse con Earth Engine.</span>
+          </div>
+          <div class="recuperacion-paso">
+            <b>3. Comparta el detalle</b>
+            <span>Abra el detalle técnico inferior y envíe únicamente el mensaje de error.</span>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def mostrar_leyenda(titulo, elementos):
     st.markdown(f"**{titulo}**")
     filas = []
@@ -1571,24 +2141,77 @@ def mostrar_resultados(
     prioridad = resultados["prioridad"]
     color = {
         "Alta": "#b71c1c",
-        "Media": "#e65100",
-        "Preventiva": "#f9a825",
+        "Media": "#a33a00",
+        "Preventiva": "#8a5b00",
         "Baja": "#2e7d32",
     }[prioridad]
+    fuentes_principales = sum(
+        bool(resultados[clave])
+        for clave in ("senal_tmf", "senal_esri", "senal_hansen")
+    )
+    if fuentes_principales == 0:
+        titulo_hallazgo = "Sin señales principales que eleven la prioridad"
+        detalle_hallazgo = (
+            "JRC, ESRI y Hansen no superaron los umbrales operativos definidos para esta área."
+        )
+        titulo_ubicacion = "No hay un sector prioritario confirmado"
+        detalle_ubicacion = (
+            "Aun así, revise el mapa si necesita documentar la condición actual del predio."
+        )
+    elif fuentes_principales == 1:
+        titulo_hallazgo = "Una fuente principal presenta una señal"
+        detalle_hallazgo = (
+            "Conviene contrastarla con los demás mapas y con información del predio antes de interpretarla."
+        )
+        titulo_ubicacion = "Revise primero las zonas resaltadas"
+        detalle_ubicacion = (
+            "El mapa permite ubicar la señal; su color no establece automáticamente la causa del cambio."
+        )
+    else:
+        titulo_hallazgo = f"{fuentes_principales} fuentes principales presentan señales"
+        detalle_hallazgo = (
+            "La necesidad de revisión aumenta, aunque las fuentes no deben interpretarse como coincidencia píxel a píxel."
+        )
+        titulo_ubicacion = "Priorice los sectores señalados en varios mapas"
+        detalle_ubicacion = (
+            "Compare la ubicación visual y luego confróntela con imágenes recientes y documentos del predio."
+        )
     st.markdown(
         f"""
-        <div style="background:{color}; color:white; padding:1rem 1.2rem;
-                    border-radius:.55rem; margin:.5rem 0 1rem 0;">
-          <div style="font-size:1.25rem; font-weight:700;">PRIORIDAD {prioridad.upper()} DE REVISIÓN</div>
-          <div>Índice operativo: {resultados['puntaje']:.1f}/6.0</div>
-          <div style="margin-top:.35rem;">{texto_recomendacion(prioridad)}</div>
+        <div class="resultado-prioridad" style="--prioridad-color:{color};">
+          <small>Resultado integrado · índice operativo {resultados['puntaje']:.1f}/6.0</small>
+          <strong>Prioridad {prioridad.lower()} de revisión</strong>
+          <p>{html_lib.escape(texto_recomendacion(prioridad))}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown("### Lectura rápida")
+    st.markdown(
+        f"""
+        <div class="lectura-rapida" aria-label="Interpretación resumida del resultado">
+          <div class="lectura-tarjeta">
+            <small>Qué se detectó</small>
+            <b>{html_lib.escape(titulo_hallazgo)}</b>
+            <p>{html_lib.escape(detalle_hallazgo)}</p>
+          </div>
+          <div class="lectura-tarjeta">
+            <small>Dónde mirar</small>
+            <b>{html_lib.escape(titulo_ubicacion)}</b>
+            <p>{html_lib.escape(detalle_ubicacion)}</p>
+          </div>
+          <div class="lectura-tarjeta">
+            <small>Qué hacer después</small>
+            <b>Documente la revisión</b>
+            <p>{html_lib.escape(texto_recomendacion(prioridad))}</p>
+          </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
     area = resultados["area_ha"]
     pct_arboles = resultados["esri_arboles_final"] / area * 100 if area else 0
-    resumen, detalle = st.tabs(["Lectura sencilla", "Detalle técnico por fuente"])
+    resumen, detalle = st.tabs(["Resumen para decidir", "Evidencia por fuente"])
     with resumen:
         st.markdown(
             "**¿Qué significa?** La prioridad sirve para decidir dónde conviene revisar "
@@ -1599,7 +2222,7 @@ def mostrar_resultados(
         c2.metric("Árboles que cambiaron", f"{resultados['esri_salida']:.1f} ha", f"{resultados['pct_esri_salida']:.1f}% del área", delta_color="off")
         c3.metric("Pérdida posterior a 2020", f"{resultados['hansen_post']:.2f} ha")
         c4.metric("Deforestación señalada por JRC", f"{resultados['tmf_deforestacion']:.1f} ha")
-        st.markdown(f"**Siguiente paso recomendado:** {texto_recomendacion(prioridad)}")
+        st.markdown(f"**Acción sugerida:** {texto_recomendacion(prioridad)}")
 
     filas = [
         (
@@ -1642,11 +2265,11 @@ def mostrar_resultados(
         c3.metric("Deforestación JRC", f"{resultados['tmf_deforestacion']:.1f} ha")
         c4.metric("Recuperación JRC", f"{resultados['tmf_recuperacion']:.1f} ha")
         for titulo, texto_detalle, alerta in filas:
-            icono = "⚠" if alerta else "✓"
+            estado = "SEÑAL" if alerta else "SIN SEÑAL OPERATIVA"
             color_texto = "#c62828" if alerta else "#2e7d32"
             st.markdown(
                 f'<div class="resultado-fuente"><b style="color:{color_texto};">'
-                f"{icono} {titulo}</b><br/>{texto_detalle}</div>",
+                f"{estado} · {titulo}</b><br/>{texto_detalle}</div>",
                 unsafe_allow_html=True,
             )
         st.caption("Use el menú de cada gráfico para guardarlo como imagen o descargar sus datos.")
@@ -1691,37 +2314,59 @@ def mostrar_resultados(
 st.markdown(
     """
     <div class="cabecera-app">
-      <h1>Visor de preevaluación territorial</h1>
-      <p>Herramienta de apoyo para identificar señales territoriales y orientar revisiones.
-      Los resultados son indicativos: no sustituyen la verificación de campo ni determinan
-      cumplimiento del Reglamento EUDR.</p>
+      <h1>PREEVALUACIÓN TERRITORIAL</h1>
+      <div class="subtitulo-app">Análisis territorial guiado</div>
+      <p>Integra evidencia satelital para reconocer señales de cambio y organizar una revisión
+      posterior. El recorrido está diseñado para personas con o sin experiencia en información
+      geográfica.</p>
+      <div class="alcance-app">Resultado indicativo · requiere interpretación documental y
+      verificación de campo · no determina cumplimiento EUDR</div>
     </div>
     """,
     unsafe_allow_html=True,
 )
-st.caption(f"Versión {APP_VERSION} · Informe PDF con mapas temáticos")
 
-with st.expander("Cómo utilizar el visor", expanded=False):
+with st.expander("Antes de comenzar: qué hace y qué no hace esta herramienta", expanded=False):
     st.markdown(
         """
-        1. **Seleccione una finca, dibuje un polígono o elija toda la cuenca**.
-        2. **Elija qué desea revisar**; la opción recomendada configura las capas automáticamente.
-        3. Pulse **Ejecutar preevaluación** y espere los resultados.
-        4. Revise los mapas y descargue la ficha PDF con el diagnóstico y las imágenes.
+        La aplicación identifica **señales que justifican una revisión**, no causas definitivas.
+        El análisis conserva una configuración recomendada para que distintas fincas puedan
+        compararse bajo el mismo criterio. Las opciones técnicas solo son necesarias para
+        exploración especializada y quedan registradas en la ficha metodológica.
 
-        Los ajustes técnicos son opcionales y están disponibles en **Configuración avanzada**.
+        Al finalizar podrá descargar el informe PDF y un archivo JSON con las fuentes,
+        períodos, umbrales, pesos y reglas utilizados.
         """
     )
 
 try:
     iniciar_earth_engine()
 
-    st.sidebar.markdown("## 1. Área que desea evaluar")
+    st.sidebar.markdown("## Configurar análisis")
+    st.sidebar.caption("Paso 1 de 2 · Seleccione la unidad territorial")
+    etiquetas_area = {
+        "Finca de monitoreo": "Finca registrada (recomendado)",
+        "Dibujar polígono en el mapa": "Dibujar un área en el mapa",
+        "Toda la cuenca": "Toda la cuenca (análisis regional)",
+    }
+    descripciones_area = {
+        "Finca de monitoreo": (
+            "Opción más rápida. Seleccione una finca disponible después de autorizar el acceso."
+        ),
+        "Dibujar polígono en el mapa": (
+            "Úsela cuando el área no aparece en la lista. El dibujo se limita automáticamente a la cuenca."
+        ),
+        "Toda la cuenca": (
+            "Evalúa la región completa. Requiere más tiempo y es menos detallada para decisiones prediales."
+        ),
+    }
     tipo_area = st.sidebar.radio(
-        "Seleccione una opción:",
+        "¿Qué área desea analizar?",
         ["Finca de monitoreo", "Dibujar polígono en el mapa", "Toda la cuenca"],
+        format_func=lambda valor: etiquetas_area[valor],
         help="Se recomienda iniciar con una finca. El análisis de toda la cuenca puede tardar varios minutos.",
     )
+    st.sidebar.caption(descripciones_area[tipo_area])
     finca_seleccionada = None
     geometria_dibujada_json = st.session_state.get("geometria_dibujada_json")
     version_mapa_dibujo = st.session_state.get("version_mapa_dibujo", 0)
@@ -1852,9 +2497,10 @@ try:
                 "Una parte del polígono estaba fuera de la cuenca y fue excluida del análisis."
             )
 
-    st.sidebar.markdown("## 2. ¿Qué desea revisar?")
+    st.sidebar.markdown("---")
+    st.sidebar.caption("Paso 2 de 2 · Seleccione el enfoque")
     objetivo = st.sidebar.selectbox(
-        "Tipo de revisión:",
+        "¿Qué desea revisar?",
         list(PERFILES_VISUALIZACION),
         help="Cada opción activa automáticamente las capas más útiles para ese objetivo.",
     )
@@ -1892,12 +2538,15 @@ try:
     anio_esri_inicial, anio_esri_final = ANO_ESRI_MIN, ANO_ESRI_MAX
     anio_ndvi_inicial = 2022
 
-    with st.sidebar.expander("Configuración avanzada (opcional)", expanded=False):
+    with st.sidebar.expander("Modo técnico · parámetros y capas", expanded=False):
         personalizar = st.checkbox(
-            "Elegir manualmente mapas y períodos",
+            "Modificar la configuración recomendada",
             value=objetivo == "Exploración personalizada",
         )
         if personalizar:
+            st.warning(
+                "Los cambios se registrarán en la ficha metodológica para conservar la trazabilidad."
+            )
             modo_comparador = st.selectbox(
                 "Comparación principal:",
                 ["JRC TMF", "ESRI LULC", "Sin comparador"],
@@ -1948,9 +2597,30 @@ try:
                 f"ESRI {ANO_ESRI_MIN}-{ANO_ESRI_MAX} y NDVI 2022-{ANO_NDVI_MAX}."
             )
 
-    columna_area, columna_superficie = st.columns(2)
-    columna_area.metric("Área seleccionada", nombre_area)
-    columna_superficie.metric("Superficie aproximada", f"{superficie_ha:,.1f} ha")
+    firma_actual = (
+        tipo_area,
+        finca_seleccionada,
+        ANO_DIAG_TMF,
+        anio_esri_inicial,
+        anio_esri_final,
+        anio_ndvi_inicial,
+        geometria_dibujada_json,
+    )
+    analisis_actual = st.session_state.get("firma_analisis") == firma_actual
+    flujo_contenedor = st.empty()
+
+    st.markdown("### Selección actual")
+    st.markdown(
+        f"""
+        <div class="contexto-analisis">
+          <div class="contexto-item"><small>Área</small><strong>{html_lib.escape(nombre_area)}</strong></div>
+          <div class="contexto-item"><small>Superficie</small><strong>{superficie_ha:,.1f} ha</strong></div>
+          <div class="contexto-item"><small>Enfoque</small><strong>{html_lib.escape(objetivo)}</strong></div>
+          <div class="contexto-item"><small>Configuración</small><strong>{'Personalizada' if personalizar else 'Recomendada'}</strong></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     if tipo_area == "Toda la cuenca":
         st.warning(
@@ -1960,8 +2630,9 @@ try:
 
     st.markdown(
         f"""
-        <div class="paso-guia"><b>Configuración lista.</b> Está revisando <b>{nombre_area}</b>
-        con el perfil <b>{objetivo}</b>. Pulse el botón de análisis antes de interpretar los mapas.</div>
+        <div class="paso-guia"><b>Configuración lista.</b> El análisis utilizará el método
+        <b>{METHODOLOGY_VERSION}</b>. Pulse <b>Ejecutar análisis</b>; después revise primero el
+        resumen y luego la evidencia cartográfica.</div>
         """,
         unsafe_allow_html=True,
     )
@@ -1979,28 +2650,23 @@ try:
             """
         )
 
-    st.subheader("3. Ejecute la preevaluación")
+    st.subheader("Ejecutar y revisar resultados")
     st.caption(
-        "El visor calculará las señales y preparará automáticamente la ficha PDF con "
-        f"seis mapas temáticos. El diagnóstico forestal utiliza JRC TMF {ANO_DIAG_TMF}; "
-        "los años del barrido no cambian el resultado. El proceso puede tardar un momento."
+        "Primero se calcularán únicamente las señales y el resumen. El informe con seis mapas "
+        "se preparará después, solo si usted lo solicita. "
+        f"JRC TMF {ANO_DIAG_TMF} permanece fijo para comparar todas las áreas con el mismo criterio."
     )
-    firma_actual = (
-        tipo_area,
-        finca_seleccionada,
-        ANO_DIAG_TMF,
-        anio_esri_inicial,
-        anio_esri_final,
-        anio_ndvi_inicial,
-        geometria_dibujada_json,
-    )
+    entregables_contenedor = st.empty()
+    if not analisis_actual:
+        mostrar_entregables(entregables_contenedor)
     if st.button(
-        "Ejecutar preevaluación",
+        "Ejecutar análisis",
         type="primary",
         use_container_width=True,
-        help="Calcula los resultados y prepara el informe descargable.",
+        help="Calcula las señales territoriales. El PDF se prepara por separado para reducir la espera.",
     ):
-        with st.spinner("Calculando señales y preparando el informe cartográfico..."):
+        firma_anterior = st.session_state.get("firma_analisis")
+        with st.spinner("Calculando las señales territoriales..."):
             resultados_nuevos = ejecutar_analisis(
                 tipo_area,
                 finca_seleccionada,
@@ -2009,30 +2675,19 @@ try:
                 anio_esri_final,
                 geometria_dibujada_json,
             )
-            mapas_reporte, errores_mapas = generar_mapas_reporte(
-                tipo_area,
-                finca_seleccionada,
-                ANO_DIAG_TMF,
-                anio_esri_inicial,
-                anio_esri_final,
-                anio_ndvi_inicial,
-                geometria_dibujada_json,
-            )
             st.session_state["resultados_analisis"] = resultados_nuevos
             st.session_state["firma_analisis"] = firma_actual
-            st.session_state["errores_mapas"] = errores_mapas
-            if any(mapa.get("imagen") for mapa in mapas_reporte):
-                st.session_state["pdf_analisis"] = generar_pdf(
-                    nombre_area,
-                    resultados_nuevos,
-                    ANO_DIAG_TMF,
-                    anio_esri_inicial,
-                    anio_esri_final,
-                    anio_ndvi_inicial,
-                    mapas_reporte,
-                )
-            else:
+            if firma_anterior != firma_actual:
                 st.session_state.pop("pdf_analisis", None)
+                st.session_state.pop("firma_informe", None)
+                st.session_state.pop("errores_mapas", None)
+                st.session_state.pop("intento_informe", None)
+                st.session_state.pop("mapas_reporte", None)
+
+    analisis_actual = st.session_state.get("firma_analisis") == firma_actual
+    mostrar_flujo(4 if analisis_actual else 3, flujo_contenedor)
+    if analisis_actual:
+        entregables_contenedor.empty()
 
     if st.session_state.get("firma_analisis") == firma_actual:
         resultados = st.session_state["resultados_analisis"]
@@ -2042,42 +2697,177 @@ try:
             anio_esri_inicial,
             anio_esri_final,
         )
-        errores_mapas = st.session_state.get("errores_mapas", [])
-        if errores_mapas:
-            disponibles = 6 - len(errores_mapas)
-            if disponibles:
-                st.warning(
-                    f"El informe contiene {disponibles} de 6 mapas. Algunas imágenes "
-                    "no estuvieron disponibles temporalmente; puede ejecutar nuevamente el análisis."
+        registro_resultados = construir_registro_metodologico(
+            tipo_area,
+            finca_seleccionada,
+            geometria_dibujada_json,
+            anio_esri_inicial,
+            anio_esri_final,
+            anio_ndvi_inicial,
+            resultados,
+        )
+        nombre_archivo = re.sub(r"[^A-Za-z0-9_-]+", "_", nombre_area).strip("_").lower()
+        columna_pdf, columna_metodo = st.columns(2)
+        informe_actual = (
+            st.session_state.get("firma_informe") == firma_actual
+            and st.session_state.get("pdf_analisis")
+        )
+        errores_informe = (
+            st.session_state.get("errores_mapas", [])
+            if st.session_state.get("firma_informe") == firma_actual
+            else []
+        )
+        if not informe_actual or errores_informe:
+            etiqueta_informe = (
+                "Reintentar mapas faltantes"
+                if informe_actual and errores_informe
+                else "Preparar informe PDF"
+            )
+            preparar_informe = columna_pdf.button(
+                etiqueta_informe,
+                use_container_width=True,
+                key="preparar-informe-pdf",
+                help=(
+                    "Solicita en paralelo las seis imágenes temáticas a Earth Engine y arma "
+                    "el documento. Si ya existe un informe parcial, vuelve a intentar los mapas."
+                ),
+            )
+            if preparar_informe:
+                # El primer intento conserva una clave de caché estable. Solo se
+                # crea una clave nueva cuando el usuario reintenta mapas faltantes.
+                intento_informe = (
+                    st.session_state.get("intento_informe", 0) + 1
+                    if errores_informe
+                    else 0
                 )
-            else:
-                st.error(
-                    "Earth Engine no entregó las imágenes cartográficas. No se generó un PDF "
-                    "incompleto. Ejecute nuevamente la preevaluación y, si continúa, envíe el "
-                    "detalle técnico mostrado abajo."
-                )
-            with st.expander("Detalle de los mapas no disponibles", expanded=False):
-                st.code("\n".join(errores_mapas))
-        if st.session_state.get("pdf_analisis"):
-            nombre_archivo = re.sub(r"[^A-Za-z0-9_-]+", "_", nombre_area).strip("_").lower()
-            st.download_button(
-                "Descargar informe PDF con mapas",
-                data=st.session_state["pdf_analisis"],
+                st.session_state["intento_informe"] = intento_informe
+                with st.status(
+                    "Preparando el informe cartográfico...",
+                    expanded=True,
+                ) as estado_informe:
+                    try:
+                        estado_informe.write(
+                            "Solicitando seis mapas a Earth Engine en grupos de tres."
+                        )
+                        mapas_reporte, errores_mapas = generar_mapas_reporte(
+                            tipo_area,
+                            finca_seleccionada,
+                            ANO_DIAG_TMF,
+                            anio_esri_inicial,
+                            anio_esri_final,
+                            anio_ndvi_inicial,
+                            geometria_dibujada_json,
+                            intento_informe,
+                            st.session_state.get("mapas_reporte")
+                            if errores_informe
+                            else None,
+                        )
+                        disponibles = sum(
+                            1 for mapa_reporte in mapas_reporte if mapa_reporte.get("imagen")
+                        )
+                        estado_informe.write(
+                            f"Earth Engine entregó {disponibles} de 6 mapas. Armando el PDF."
+                        )
+                        st.session_state["errores_mapas"] = errores_mapas
+                        st.session_state["mapas_reporte"] = mapas_reporte
+                        st.session_state["firma_informe"] = firma_actual
+                        if disponibles:
+                            st.session_state["pdf_analisis"] = generar_pdf(
+                                nombre_area,
+                                resultados,
+                                ANO_DIAG_TMF,
+                                anio_esri_inicial,
+                                anio_esri_final,
+                                anio_ndvi_inicial,
+                                mapas_reporte,
+                            )
+                            estado_informe.update(
+                                label="Informe listo para descargar",
+                                state="complete",
+                                expanded=False,
+                            )
+                        else:
+                            st.session_state.pop("pdf_analisis", None)
+                            estado_informe.update(
+                                label="Earth Engine no entregó los mapas",
+                                state="error",
+                                expanded=True,
+                            )
+                    except Exception as error:
+                        st.session_state.pop("pdf_analisis", None)
+                        st.session_state.pop("firma_informe", None)
+                        st.session_state["errores_mapas"] = [
+                            f"Preparación del informe: {type(error).__name__}"
+                        ]
+                        estado_informe.update(
+                            label="No fue posible preparar el informe",
+                            state="error",
+                            expanded=True,
+                        )
+                        st.error(
+                            "La solicitud cartográfica no finalizó. Puede intentarlo nuevamente; "
+                            "los resultados del análisis permanecen disponibles."
+                        )
+                informe_actual = st.session_state.get("pdf_analisis")
+
+        if informe_actual:
+            columna_pdf.download_button(
+                "Descargar informe PDF",
+                data=informe_actual,
                 file_name=f"ficha_preevaluacion_{nombre_archivo}.pdf",
                 mime="application/pdf",
+                on_click="ignore",
                 type="primary",
                 use_container_width=True,
             )
+        else:
+            columna_pdf.caption(
+                "El PDF se prepara por separado. Los seis mapas se solicitan en paralelo para reducir la espera."
+            )
+        columna_metodo.download_button(
+            "Descargar registro metodológico",
+            data=json.dumps(
+                registro_resultados,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            ),
+            file_name=f"metodologia_preevaluacion_{nombre_archivo}.json",
+            mime="application/json",
+            on_click="ignore",
+            use_container_width=True,
+            help="Contiene fuentes, períodos, umbrales, pesos, reglas y el resumen del resultado.",
+        )
+
+        if st.session_state.get("firma_informe") == firma_actual:
+            errores_mapas = st.session_state.get("errores_mapas", [])
+            if errores_mapas:
+                disponibles = 6 - len(errores_mapas)
+                if disponibles:
+                    st.warning(
+                        f"El informe contiene {disponibles} de 6 mapas. Algunas imágenes no "
+                        "estuvieron disponibles temporalmente; puede volver a preparar el PDF."
+                    )
+                else:
+                    st.error(
+                        "Earth Engine no entregó las imágenes cartográficas. No se generó un PDF "
+                        "incompleto. Vuelva a preparar el informe y, si continúa, envíe el detalle "
+                        "técnico mostrado abajo."
+                    )
+                with st.expander("Detalle de los mapas no disponibles", expanded=False):
+                    st.code("\n".join(errores_mapas))
     elif "resultados_analisis" in st.session_state:
         st.warning(
             "Cambió el área o el período. Ejecute nuevamente la preevaluación para "
             "actualizar los resultados y el informe."
         )
     else:
-        st.info("Los resultados aparecerán aquí después de ejecutar la preevaluación.")
+        st.info(
+            "Cuando ejecute el análisis aparecerán el resumen, el detalle por fuente y los archivos de respaldo."
+        )
 
     st.divider()
-    st.subheader("4. Explore los mapas")
+    st.subheader("Evidencia cartográfica")
 
     mapa = folium.Map(
         location=[8.7, -80.0],
@@ -2324,22 +3114,62 @@ try:
             with columnas_leyenda[indice % 2]:
                 mostrar_leyenda(titulo, elementos)
 
-    with st.expander("Fuentes utilizadas y alcance de la herramienta", expanded=False):
-        st.markdown(
-            """
-            - **JRC Tropical Moist Forest:** estado anual del bosque tropical húmedo.
-            - **Hansen Global Forest Change:** alertas anuales de pérdida de cobertura arbórea.
-            - **ESRI Land Use/Land Cover:** clases de uso y cobertura del suelo a 10 m.
-            - **GEDI / OpenForis:** altura estimada del dosel y disponibilidad de datos.
-            - **Sentinel-2 NDVI:** vigor vegetal y su cambio entre dos períodos.
-
-            Las fuentes tienen resoluciones, fechas y metodologías diferentes. El visor integra
-            señales por área para priorizar revisiones; no compara píxeles exactos entre productos
-            y no constituye una certificación ni una determinación legal.
-            """
+    with st.expander("Metodología y reproducibilidad", expanded=False):
+        st.markdown(f"**Metodología aplicada:** {METHODOLOGY_VERSION}")
+        tab_fuentes, tab_reglas, tab_limites = st.tabs(
+            ["Fuentes y períodos", "Reglas del análisis", "Alcance y limitaciones"]
         )
+        with tab_fuentes:
+            st.markdown(
+                f"""
+                | Fuente | Período o referencia | Resolución de trabajo | Función |
+                |---|---:|---:|---|
+                | JRC Tropical Moist Forest | Estado {ANO_DIAG_TMF} | 30 m | Señales de degradación y deforestación |
+                | Hansen Global Forest Change | 2001-{ANO_HANSEN_MAX}; corte {CUTOFF_LABEL} | 30 m | Pérdida de cobertura arbórea |
+                | ESRI Land Use/Land Cover | {anio_esri_inicial}-{anio_esri_final} | 10 m | Transiciones de la clase árboles |
+                | GEDI / OpenForis | Producto disponible | 100 m | Altura y cobertura válida del dosel |
+                | Sentinel-2 SR Harmonized | {anio_ndvi_inicial}-{ANO_NDVI_MAX} | 10 m | Vigor vegetal; apoyo visual |
+                """
+            )
+            with st.expander("Identificadores técnicos de los datos", expanded=False):
+                st.code(
+                    "\n".join(
+                        [TMF_ASSET, HANSEN_ASSET, ESRI_ASSET, GEDI_ASSET, "COPERNICUS/S2_SR_HARMONIZED"]
+                    )
+                )
+        with tab_reglas:
+            st.markdown(
+                f"""
+                1. Cada fuente se procesa en su propia resolución y proyección.
+                2. Las superficies se expresan en hectáreas dentro del área seleccionada.
+                3. Las señales se activan con umbrales documentados: JRC, Hansen, ESRI y GEDI.
+                4. El índice suma pesos operativos: **JRC 2.0**, **Hansen 2.0**, **ESRI 1.5** y **GEDI 0.5**.
+                5. La prioridad es **alta desde 3.0**, **media desde 1.5**, **preventiva desde 0.5** y **baja por debajo de 0.5**.
+
+                El NDVI se calcula como `(B8 - B4) / (B8 + B4)` y se utiliza únicamente
+                como apoyo visual. No modifica el índice de prioridad.
+                """
+            )
+            st.caption(
+                "Los años del comparador JRC cambian la visualización; el diagnóstico permanece fijo "
+                f"en {ANO_DIAG_TMF} para asegurar comparabilidad."
+            )
+        with tab_limites:
+            st.markdown(
+                """
+                - Una señal satelital no confirma por sí sola la causa de un cambio.
+                - Las fuentes tienen fechas, resoluciones y metodologías diferentes.
+                - La altura GEDI depende de la disponibilidad espacial del producto.
+                - El NDVI puede responder a estacionalidad, humedad, nubes, cultivos o pastizales.
+                - Los resultados deben contrastarse con documentos, imágenes recientes y campo.
+
+                **Esta herramienta orienta revisiones. No es una certificación, una validación de
+                campo ni una determinación de cumplimiento EUDR.**
+                """
+            )
 
 except Exception as error:
-    st.error("No fue posible cargar el visor territorial.")
+    mostrar_flujo(1)
+    mostrar_error_amigable(error)
     with st.expander("Detalle técnico para soporte", expanded=False):
         st.code(f"{type(error).__name__}: {error}")
