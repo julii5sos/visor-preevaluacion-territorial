@@ -7,7 +7,7 @@ cumplimiento EUDR.
 
 ## Versión actual
 
-La versión principal de la nueva experiencia es **v0.1.6**. El historial completo
+La versión principal de la nueva experiencia es **v0.1.7**. El historial completo
 de mejoras y correcciones está disponible en [CHANGELOG.md](CHANGELOG.md).
 
 ## Flujo para el usuario

@@ -4,7 +4,21 @@ Este historial documenta la evolución de la aplicación UX. Las versiones sigue
 el formato `MAJOR.MINOR.PATCH`: una versión principal, mejoras compatibles y
 correcciones compatibles, respectivamente.
 
-## [0.1.6] - 2026-07-22 — versión actual
+## [0.1.7] - 2026-07-24 — versión actual
+
+### Corregido
+
+- Los controles de información de la leyenda NDVI ahora se abren con clic o toque,
+  además de admitir navegación mediante teclado.
+- Cada explicación aparece debajo de su categoría y muestra el intervalo NDVI
+  correspondiente sin depender de una ayuda emergente al pasar el cursor.
+
+### Accesibilidad
+
+- El área interactiva ocupa toda la línea de la categoría, conserva un indicador
+  de foco visible y funciona en pantallas táctiles.
+
+## [0.1.6] - 2026-07-22
 
 ### Añadido
 
@@ -97,6 +111,7 @@ correcciones compatibles, respectivamente.
 - El alcance indicativo: la aplicación no constituye validación de campo ni
   determina cumplimiento EUDR.
 
+[0.1.7]: https://github.com/julii5sos/visor-preevaluacion-territorial/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/julii5sos/visor-preevaluacion-territorial/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/julii5sos/visor-preevaluacion-territorial/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/julii5sos/visor-preevaluacion-territorial/compare/v0.1.3...v0.1.4

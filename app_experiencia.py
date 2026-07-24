@@ -135,8 +135,9 @@ st.markdown(
         margin: .5rem 0;
     }
     .leyenda-fila {
-        display: flex;
-        align-items: center;
+        display: grid;
+        grid-template-columns: 1.05rem minmax(0, 1fr);
+        align-items: start;
         gap: .55rem;
         margin: .22rem 0;
         font-size: .9rem;
@@ -147,14 +148,63 @@ st.markdown(
         border: 1px solid rgba(0,0,0,.35);
         flex: 0 0 1.05rem;
     }
-    .leyenda-texto {flex: 0 1 auto;}
+    .leyenda-texto {
+        align-self: center;
+        line-height: 1.4;
+    }
+    .leyenda-detalle {
+        min-width: 0;
+        margin: 0;
+    }
+    .leyenda-detalle summary {
+        display: flex;
+        align-items: center;
+        gap: .45rem;
+        min-height: 2.75rem;
+        margin: 0;
+        padding: .35rem 0;
+        cursor: pointer;
+        list-style: none;
+        touch-action: manipulation;
+    }
+    .leyenda-detalle summary::-webkit-details-marker {display: none;}
+    .leyenda-detalle summary:focus-visible {
+        outline: 3px solid rgba(47, 99, 56, .35);
+        outline-offset: 2px;
+        border-radius: .2rem;
+    }
     .leyenda-info {
+        display: inline-grid;
+        place-items: center;
+        width: 1.55rem;
+        height: 1.55rem;
+        border: 1.5px solid currentColor;
+        border-radius: 50%;
         color: #2f6338;
-        cursor: help;
-        font-size: 1rem;
+        background: #ffffff;
+        font-size: .88rem;
         font-weight: 700;
         line-height: 1;
-        margin-left: -.2rem;
+        flex: 0 0 1.55rem;
+        transition: background-color .18s ease, color .18s ease;
+    }
+    .leyenda-detalle summary:hover .leyenda-info,
+    .leyenda-detalle[open] .leyenda-info {
+        color: #ffffff;
+        background: #2f6338;
+    }
+    .leyenda-ayuda {
+        margin: .35rem 0 .55rem;
+        padding: .5rem .65rem;
+        border-left: 3px solid #2f6338;
+        border-radius: 0 .2rem .2rem 0;
+        background: #eef4ed;
+        color: #27352b;
+        font-size: .84rem;
+        line-height: 1.45;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .leyenda-info {transition: none;}
     }
     .resultado-fuente {
         padding: .7rem .85rem;
@@ -202,7 +252,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "UX-0.1.6"
+APP_VERSION = "UX-0.1.7"
 METHODOLOGY_VERSION = "MT-2026.1"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
@@ -1779,18 +1829,28 @@ def mostrar_leyenda(titulo, elementos):
     for elemento in elementos:
         color, texto = elemento[:2]
         explicacion = elemento[2] if len(elemento) > 2 else None
-        icono_info = ""
+        texto_seguro = html_lib.escape(texto)
         if explicacion:
-            ayuda = html_lib.escape(explicacion, quote=True)
-            icono_info = (
-                f'<span class="leyenda-info" title="{ayuda}" tabindex="0" '
-                f'role="img" aria-label="Información: {ayuda}">ⓘ</span>'
+            ayuda = html_lib.escape(explicacion)
+            etiqueta = html_lib.escape(
+                f"{texto}: pulse para ver la explicación",
+                quote=True,
             )
+            contenido = (
+                f'<details class="leyenda-detalle">'
+                f'<summary aria-label="{etiqueta}">'
+                f'<span class="leyenda-texto">{texto_seguro}</span>'
+                f'<span class="leyenda-info" aria-hidden="true">i</span>'
+                f'</summary>'
+                f'<div class="leyenda-ayuda">{ayuda}</div>'
+                f'</details>'
+            )
+        else:
+            contenido = f'<span class="leyenda-texto">{texto_seguro}</span>'
         filas.append(
             f'<div class="leyenda-fila"><span class="leyenda-color" '
             f'style="background:{color};"></span>'
-            f'<span class="leyenda-texto">{html_lib.escape(texto)}</span>'
-            f'{icono_info}</div>'
+            f'{contenido}</div>'
         )
     st.markdown("".join(filas), unsafe_allow_html=True)
 
