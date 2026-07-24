@@ -28,6 +28,17 @@ from reportlab.platypus import (
 )
 from streamlit_folium import st_folium
 
+from metodologia_indice import (
+    JUSTIFICACION_PESOS,
+    JUSTIFICACION_UMBRALES,
+    PESOS_INDICE,
+    PUNTAJE_MAXIMO,
+    REGLAS_PRIORIDAD,
+    UMBRALES_INDICE,
+    calcular_indice_prioridad,
+    evaluar_senales,
+)
+
 
 st.set_page_config(
     page_title="Visor de preevaluación territorial",
@@ -165,7 +176,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "1.2.8"
+APP_VERSION = "1.2.9"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
 ASSET_CUENCA = (
@@ -196,14 +207,16 @@ ANO_NDVI_MAX = 2025
 CUTOFF_YEAR = 20
 CUTOFF_LABEL = "31/12/2020"
 
-UMBRAL_ALERTA_HANSEN_HA = 0.18
-UMBRAL_REVISION_TMF_DEGRAD_HA = 2.0
-UMBRAL_REVISION_TMF_DEFOR_HA = 0.5
-UMBRAL_PCT_TMF_DEFOR = 1.0
-UMBRAL_PCT_TMF_DEGRAD = 5.0
-UMBRAL_PCT_ESRI_SALIDA = 5.0
-UMBRAL_DOSEL_BAJO_M = 8.0
-UMBRAL_COBERTURA_GEDI_PCT = 20.0
+UMBRAL_ALERTA_HANSEN_HA = UMBRALES_INDICE["hansen_post_2020_ha"]
+UMBRAL_REVISION_TMF_DEGRAD_HA = UMBRALES_INDICE["jrc_degradacion_ha"]
+UMBRAL_REVISION_TMF_DEFOR_HA = UMBRALES_INDICE["jrc_deforestacion_ha"]
+UMBRAL_PCT_TMF_DEFOR = UMBRALES_INDICE["jrc_deforestacion_pct"]
+UMBRAL_PCT_TMF_DEGRAD = UMBRALES_INDICE["jrc_degradacion_pct"]
+UMBRAL_PCT_ESRI_SALIDA = UMBRALES_INDICE["esri_salida_arboles_pct"]
+UMBRAL_ESRI_SALIDA_HA = UMBRALES_INDICE["esri_salida_arboles_ha"]
+UMBRAL_DOSEL_BAJO_M = UMBRALES_INDICE["gedi_dosel_bajo_m"]
+UMBRAL_COBERTURA_GEDI_PCT = UMBRALES_INDICE["gedi_cobertura_minima_pct"]
+UMBRAL_LINEA_BASE_GEDI_PCT = UMBRALES_INDICE["gedi_linea_base_minima_pct"]
 
 ESRI_ORIG = [1, 2, 4, 5, 7, 8, 9, 10, 11]
 ESRI_VIS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -893,38 +906,28 @@ def ejecutar_analisis(
     pct_esri_salida = resultados["esri_salida"] / area_ha * 100 if area_ha else 0
     pct_linea_base = resultados["linea_base"] / area_ha * 100 if area_ha else 0
 
-    senal_tmf = (
-        resultados["tmf_deforestacion"] >= UMBRAL_REVISION_TMF_DEFOR_HA
-        or pct_tmf_defor >= UMBRAL_PCT_TMF_DEFOR
-        or resultados["tmf_degradacion"] >= UMBRAL_REVISION_TMF_DEGRAD_HA
-        or pct_tmf_degrad >= UMBRAL_PCT_TMF_DEGRAD
+    senales, gedi_disponible = evaluar_senales(
+        tmf_deforestacion_ha=resultados["tmf_deforestacion"],
+        tmf_deforestacion_pct=pct_tmf_defor,
+        tmf_degradacion_ha=resultados["tmf_degradacion"],
+        tmf_degradacion_pct=pct_tmf_degrad,
+        hansen_post_2020_ha=resultados["hansen_post"],
+        esri_salida_arboles_ha=resultados["esri_salida"],
+        esri_salida_arboles_pct=pct_esri_salida,
+        gedi_altura_media_m=resultados["gedi_altura"],
+        gedi_cobertura_valida_pct=resultados["gedi_cobertura_pct"],
+        linea_base_arborea_pct=pct_linea_base,
     )
-    senal_hansen = resultados["hansen_post"] >= UMBRAL_ALERTA_HANSEN_HA
-    senal_esri = (
-        resultados["esri_salida"] >= 0.10
-        and pct_esri_salida >= UMBRAL_PCT_ESRI_SALIDA
-    )
-    gedi_disponible = resultados["gedi_cobertura_pct"] >= UMBRAL_COBERTURA_GEDI_PCT
-    senal_gedi = (
-        gedi_disponible
-        and resultados["gedi_altura"] < UMBRAL_DOSEL_BAJO_M
-        and pct_linea_base >= 10
-    )
+    senal_tmf = senales["tmf"]
+    senal_hansen = senales["hansen"]
+    senal_esri = senales["esri"]
+    senal_gedi = senales["gedi"]
 
-    puntaje = (
-        (2.0 if senal_tmf else 0.0)
-        + (2.0 if senal_hansen else 0.0)
-        + (1.5 if senal_esri else 0.0)
-        + (0.5 if senal_gedi else 0.0)
-    )
-    prioridad = (
-        "Alta"
-        if puntaje >= 3
-        else "Media"
-        if puntaje >= 1.5
-        else "Preventiva"
-        if puntaje >= 0.5
-        else "Baja"
+    aportes_indice, puntaje, prioridad = calcular_indice_prioridad(
+        senal_tmf=senal_tmf,
+        senal_hansen=senal_hansen,
+        senal_esri=senal_esri,
+        senal_gedi=senal_gedi,
     )
 
     resultados.update(
@@ -938,6 +941,7 @@ def ejecutar_analisis(
             "senal_esri": senal_esri,
             "senal_gedi": senal_gedi,
             "gedi_disponible": gedi_disponible,
+            "aportes_indice": aportes_indice,
             "puntaje": puntaje,
             "prioridad": prioridad,
         }
@@ -1206,6 +1210,22 @@ def generar_pdf(
     )
 
     r = resultados
+    aportes = r["aportes_indice"]
+    texto_justificacion_pesos = " ".join(
+        JUSTIFICACION_PESOS[fuente]
+        for fuente in ("tmf", "hansen", "esri", "gedi", "ndvi")
+    )
+    texto_justificacion_umbrales = " ".join(
+        JUSTIFICACION_UMBRALES[criterio]
+        for criterio in (
+            "hansen_post_2020_ha",
+            "jrc_deforestacion",
+            "jrc_degradacion",
+            "esri_salida_arboles",
+            "gedi_dosel_y_cobertura",
+            "ndvi",
+        )
+    )
     area = r["area_ha"]
     pct_arbol = r["esri_arboles_final"] / area * 100 if area else 0
     pct_ganancia = r["esri_ganancia"] / area * 100 if area else 0
@@ -1282,7 +1302,8 @@ def generar_pdf(
     tarjeta_prioridad = Table(
         [[Paragraph(
             f"<b>PRIORIDAD {r['prioridad'].upper()} DE REVISIÓN</b><br/>"
-            f"Índice operativo: {r['puntaje']:.1f}/6.0 - {texto_recomendacion(r['prioridad'])}",
+            f"Índice operativo: {r['puntaje']:.1f}/{PUNTAJE_MAXIMO:.1f} - "
+            f"{texto_recomendacion(r['prioridad'])}",
             ParagraphStyle(
                 "Prioridad",
                 fontName="Times-Roman",
@@ -1455,12 +1476,12 @@ def generar_pdf(
 
     historia.extend([PageBreak(), Paragraph("DIAGNÓSTICO POR FUENTE", estilos["TituloFicha"])])
     filas_fuentes = [
-        ["Fuente", "Resultado específico", "Señal"],
-        [f"JRC TMF {anio_tmf_diagnostico}", f"Deforestación {r['tmf_deforestacion']:.1f} ha; degradación {r['tmf_degradacion']:.1f} ha", "Sí" if r["senal_tmf"] else "No"],
-        [f"ESRI {anio_esri_inicial}-{anio_esri_final}", f"Salida de árboles {r['esri_salida']:.1f} ha ({r['pct_esri_salida']:.1f}%)", "Sí" if r["senal_esri"] else "No"],
-        ["Hansen GFC", f"Pérdida posterior al {CUTOFF_LABEL}: {r['hansen_post']:.2f} ha", "Sí" if r["senal_hansen"] else "No"],
-        ["GEDI", f"Dosel {r['gedi_altura']:.1f} m; área con datos válidos {r['gedi_cobertura_pct']:.0f}%" if r["gedi_disponible"] else "Datos insuficientes", "Contexto" if r["senal_gedi"] else "No"],
-        [f"NDVI {anio_ndvi_inicial}-{ANO_NDVI_MAX}", "Apoyo visual; no participa en el índice operativo", "No aplica"],
+        ["Fuente", "Resultado específico", "Señal", "Aporte"],
+        [f"JRC TMF {anio_tmf_diagnostico}", f"Deforestación {r['tmf_deforestacion']:.1f} ha; degradación {r['tmf_degradacion']:.1f} ha", "Sí" if r["senal_tmf"] else "No", f"{aportes['tmf']:.1f}/{PESOS_INDICE['tmf']:.1f}"],
+        ["Hansen GFC", f"Pérdida posterior al {CUTOFF_LABEL}: {r['hansen_post']:.2f} ha", "Sí" if r["senal_hansen"] else "No", f"{aportes['hansen']:.1f}/{PESOS_INDICE['hansen']:.1f}"],
+        [f"ESRI {anio_esri_inicial}-{anio_esri_final}", f"Salida de árboles {r['esri_salida']:.1f} ha ({r['pct_esri_salida']:.1f}%)", "Sí" if r["senal_esri"] else "No", f"{aportes['esri']:.1f}/{PESOS_INDICE['esri']:.1f}"],
+        ["GEDI", f"Dosel {r['gedi_altura']:.1f} m; área con datos válidos {r['gedi_cobertura_pct']:.0f}%" if r["gedi_disponible"] else "Datos insuficientes", "Contexto" if r["senal_gedi"] else "No", f"{aportes['gedi']:.1f}/{PESOS_INDICE['gedi']:.1f}"],
+        [f"NDVI {anio_ndvi_inicial}-{ANO_NDVI_MAX}", "Apoyo visual; no participa en el índice operativo", "No aplica", "0.0"],
     ]
     filas_fuentes = [
         [
@@ -1469,7 +1490,11 @@ def generar_pdf(
         ]
         for i, fila in enumerate(filas_fuentes)
     ]
-    tabla_fuentes = Table(filas_fuentes, colWidths=[4.0 * cm, 9.8 * cm, 2.4 * cm], repeatRows=1)
+    tabla_fuentes = Table(
+        filas_fuentes,
+        colWidths=[3.3 * cm, 8.0 * cm, 2.2 * cm, 2.8 * cm],
+        repeatRows=1,
+    )
     tabla_fuentes.setStyle(
         TableStyle(
             [
@@ -1501,9 +1526,18 @@ def generar_pdf(
             ),
             Paragraph(
                 "Los pesos del índice son criterios operativos preliminares: JRC TMF 2.0, "
-                "Hansen 2.0, ESRI 1.5 y GEDI 0.5. El índice no representa una probabilidad, "
+                "Hansen 2.0, ESRI 1.5, GEDI 0.5 y NDVI 0.0. Cada fuente se suma una sola vez. "
+                "El índice no representa una probabilidad, "
                 "una certificación, una determinación legal ni una confirmación definitiva "
                 "de deforestación o de cumplimiento EUDR.",
+                estilos["CuerpoFicha"],
+            ),
+            Paragraph(
+                f"<b>Justificación de los pesos.</b> {texto_justificacion_pesos}",
+                estilos["CuerpoFicha"],
+            ),
+            Paragraph(
+                f"<b>Justificación de los umbrales.</b> {texto_justificacion_umbrales}",
                 estilos["CuerpoFicha"],
             ),
         ]
@@ -1580,14 +1614,23 @@ def mostrar_resultados(
         <div style="background:{color}; color:white; padding:1rem 1.2rem;
                     border-radius:.55rem; margin:.5rem 0 1rem 0;">
           <div style="font-size:1.25rem; font-weight:700;">PRIORIDAD {prioridad.upper()} DE REVISIÓN</div>
-          <div>Índice operativo: {resultados['puntaje']:.1f}/6.0</div>
+          <div>Índice operativo: {resultados['puntaje']:.1f}/{PUNTAJE_MAXIMO:.1f}</div>
           <div style="margin-top:.35rem;">{texto_recomendacion(prioridad)}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    area = resultados["area_ha"]
-    pct_arboles = resultados["esri_arboles_final"] / area * 100 if area else 0
+    aportes = resultados["aportes_indice"]
+    st.markdown("#### Composición ponderada del índice")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("JRC TMF", f"{aportes['tmf']:.1f} / {PESOS_INDICE['tmf']:.1f}")
+    c2.metric("Hansen GFC", f"{aportes['hansen']:.1f} / {PESOS_INDICE['hansen']:.1f}")
+    c3.metric("ESRI LULC", f"{aportes['esri']:.1f} / {PESOS_INDICE['esri']:.1f}")
+    c4.metric("GEDI", f"{aportes['gedi']:.1f} / {PESOS_INDICE['gedi']:.1f}")
+    st.caption(
+        "Cada fuente puede sumar una sola vez. JRC y Hansen aportan como máximo "
+        "2.0 cada uno; ESRI 1.5, GEDI 0.5 y NDVI 0.0."
+    )
     resumen, detalle = st.tabs(["Lectura sencilla", "Detalle técnico por fuente"])
     with resumen:
         st.markdown(
@@ -1595,43 +1638,59 @@ def mostrar_resultados(
             "imágenes, documentos o realizar una visita. No demuestra por sí sola la causa del cambio."
         )
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Cobertura de árboles", f"{resultados['esri_arboles_final']:.1f} ha", f"{pct_arboles:.1f}% del área", delta_color="off")
-        c2.metric("Árboles que cambiaron", f"{resultados['esri_salida']:.1f} ha", f"{resultados['pct_esri_salida']:.1f}% del área", delta_color="off")
-        c3.metric("Pérdida posterior a 2020", f"{resultados['hansen_post']:.2f} ha")
-        c4.metric("Deforestación señalada por JRC", f"{resultados['tmf_deforestacion']:.1f} ha")
+        c1.metric("Deforestación JRC", f"{resultados['tmf_deforestacion']:.1f} ha")
+        c2.metric("Pérdida Hansen post-2020", f"{resultados['hansen_post']:.2f} ha")
+        c3.metric(
+            "Salida de árboles ESRI",
+            f"{resultados['esri_salida']:.1f} ha",
+            f"{resultados['pct_esri_salida']:.1f}% del área",
+            delta_color="off",
+        )
+        c4.metric(
+            "Altura media GEDI",
+            (
+                f"{resultados['gedi_altura']:.1f} m"
+                if resultados["gedi_disponible"]
+                else "Datos insuficientes"
+            ),
+        )
         st.markdown(f"**Siguiente paso recomendado:** {texto_recomendacion(prioridad)}")
 
     filas = [
         (
             f"Mapa forestal JRC {anio_tmf_diagnostico}",
             f"Deforestación {resultados['tmf_deforestacion']:.1f} ha; "
-            f"degradación {resultados['tmf_degradacion']:.1f} ha",
+            f"degradación {resultados['tmf_degradacion']:.1f} ha · "
+            f"aporte {aportes['tmf']:.1f}/{PESOS_INDICE['tmf']:.1f}",
             resultados["senal_tmf"],
+        ),
+        (
+            "Pérdida arbórea Hansen",
+            f"Pérdida post-{CUTOFF_LABEL}: {resultados['hansen_post']:.2f} ha · "
+            f"aporte {aportes['hansen']:.1f}/{PESOS_INDICE['hansen']:.1f}",
+            resultados["senal_hansen"],
         ),
         (
             f"Transiciones ESRI {anio_esri_inicial} → {anio_esri_final}",
             f"Árboles → no árbol: {resultados['esri_salida']:.1f} ha "
-            f"({resultados['pct_esri_salida']:.1f}%)",
+            f"({resultados['pct_esri_salida']:.1f}%) · "
+            f"aporte {aportes['esri']:.1f}/{PESOS_INDICE['esri']:.1f}",
             resultados["senal_esri"],
-        ),
-        (
-            "Pérdida arbórea Hansen",
-            f"Pérdida post-{CUTOFF_LABEL}: {resultados['hansen_post']:.2f} ha",
-            resultados["senal_hansen"],
         ),
         (
             "Altura del dosel GEDI",
             (
                 f"Dosel {resultados['gedi_altura']:.1f} m; "
-                f"{resultados['gedi_cobertura_pct']:.0f}% del área con datos válidos"
+                f"{resultados['gedi_cobertura_pct']:.0f}% del área con datos válidos · "
+                f"aporte {aportes['gedi']:.1f}/{PESOS_INDICE['gedi']:.1f}"
                 if resultados["gedi_disponible"]
-                else "Sin datos válidos suficientes para interpretar el dosel"
+                else "Sin datos válidos suficientes; aporte 0.0/0.5"
             ),
             resultados["senal_gedi"],
         ),
         (
             "ΔNDVI Sentinel-2",
-            "Solo visualización; activar la capa en el mapa",
+            "Solo visualización; aporte 0.0 al índice",
             False,
         ),
     ]
@@ -2331,12 +2390,41 @@ try:
             - **Hansen Global Forest Change:** alertas anuales de pérdida de cobertura arbórea.
             - **ESRI Land Use/Land Cover:** clases de uso y cobertura del suelo a 10 m.
             - **GEDI / OpenForis:** altura estimada del dosel y disponibilidad de datos.
-            - **Sentinel-2 NDVI:** vigor vegetal y su cambio entre dos períodos.
+            - **Sentinel-2 NDVI:** vigor vegetal y su cambio entre dos períodos; solo visual.
 
             Las fuentes tienen resoluciones, fechas y metodologías diferentes. El visor integra
             señales por área para priorizar revisiones; no compara píxeles exactos entre productos
             y no constituye una certificación ni una determinación legal.
             """
+        )
+        st.markdown(
+            "**Índice ponderado:** JRC TMF 2.0 + Hansen 2.0 + ESRI 1.5 + "
+            "GEDI 0.5 + NDVI 0.0. Cada fuente se suma una sola vez."
+        )
+        st.markdown("**Justificación de los pesos**")
+        st.markdown(
+            "\n".join(
+                [
+                    f"- **JRC TMF · 2.0:** {JUSTIFICACION_PESOS['tmf']}",
+                    f"- **Hansen GFC · 2.0:** {JUSTIFICACION_PESOS['hansen']}",
+                    f"- **ESRI LULC · 1.5:** {JUSTIFICACION_PESOS['esri']}",
+                    f"- **GEDI · 0.5:** {JUSTIFICACION_PESOS['gedi']}",
+                    f"- **NDVI · 0.0:** {JUSTIFICACION_PESOS['ndvi']}",
+                ]
+            )
+        )
+        st.markdown("**Justificación de los umbrales**")
+        st.markdown(
+            "\n".join(
+                [
+                    f"- **Hansen ≥ {UMBRAL_ALERTA_HANSEN_HA:.2f} ha:** {JUSTIFICACION_UMBRALES['hansen_post_2020_ha']}",
+                    f"- **JRC deforestación ≥ {UMBRAL_REVISION_TMF_DEFOR_HA:.1f} ha o {UMBRAL_PCT_TMF_DEFOR:.0f}%:** {JUSTIFICACION_UMBRALES['jrc_deforestacion']}",
+                    f"- **JRC degradación ≥ {UMBRAL_REVISION_TMF_DEGRAD_HA:.1f} ha o {UMBRAL_PCT_TMF_DEGRAD:.0f}%:** {JUSTIFICACION_UMBRALES['jrc_degradacion']}",
+                    f"- **ESRI ≥ {UMBRAL_ESRI_SALIDA_HA:.2f} ha y {UMBRAL_PCT_ESRI_SALIDA:.0f}%:** {JUSTIFICACION_UMBRALES['esri_salida_arboles']}",
+                    f"- **GEDI < {UMBRAL_DOSEL_BAJO_M:.0f} m, cobertura válida ≥ {UMBRAL_COBERTURA_GEDI_PCT:.0f}% y línea base ≥ {UMBRAL_LINEA_BASE_GEDI_PCT:.0f}%:** {JUSTIFICACION_UMBRALES['gedi_dosel_y_cobertura']}",
+                    f"- **NDVI:** {JUSTIFICACION_UMBRALES['ndvi']}",
+                ]
+            )
         )
 
 except Exception as error:
