@@ -2,7 +2,7 @@
 
 **Versión del método:** MT-2026.3
 
-**Versión de implementación auditada:** UX-0.2.3
+**Versión de implementación auditada:** UX-0.2.4
 
 ## Finalidad y alcance
 

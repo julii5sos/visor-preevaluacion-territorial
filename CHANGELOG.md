@@ -4,7 +4,20 @@ Este historial documenta la evolución de la aplicación UX. Las versiones sigue
 el formato `MAJOR.MINOR.PATCH`: una versión principal, mejoras compatibles y
 correcciones compatibles, respectivamente.
 
-## [0.2.3] - 2026-07-24 — versión actual
+## [0.2.4] - 2026-07-24 — versión actual
+
+### Control de capas del mapa
+
+- Las capas temáticas funcionan como opciones exclusivas: al seleccionar una,
+  la anterior se apaga automáticamente.
+- Se añadió la opción **Sin capa temática** para volver a la imagen satelital
+  sin superposiciones.
+- El límite de la cuenca y el área seleccionada permanecen en un grupo de
+  referencias independiente.
+- La configuración avanzada ahora aclara que allí se eligen las capas
+  disponibles, mientras que dentro del mapa se visualiza una temática a la vez.
+
+## [0.2.3] - 2026-07-24
 
 ### Lectura del vigor vegetal
 
