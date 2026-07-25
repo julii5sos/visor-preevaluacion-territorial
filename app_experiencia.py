@@ -57,17 +57,64 @@ st.markdown(
     """
     <style>
     :root {
-        --institucional-verde: #214b32;
-        --institucional-verde-claro: #e8f0e9;
-        --institucional-tinta: #1f2923;
-        --institucional-suave: #667269;
-        --institucional-borde: #cbd5ce;
-        --institucional-fondo: #f5f7f5;
+        --institucional-verde: #00544d;
+        --institucional-verde-oscuro: #00403a;
+        --institucional-verde-acento: #76b72a;
+        --institucional-verde-claro: #eaf4f0;
+        --institucional-tinta: #00544d;
+        --institucional-suave: #356b61;
+        --institucional-borde: #b6d1c8;
+        --institucional-fondo: #f6faf8;
     }
     .stApp {background: var(--institucional-fondo); color: var(--institucional-tinta);}
     html {color-scheme: light;}
     .block-container {padding-top: 4rem; padding-bottom: 2.5rem; max-width: 1440px;}
-    [data-testid="stMetricValue"] {font-size: 1.55rem; color: var(--institucional-tinta);}
+    .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6,
+    .stApp p, .stApp label, .stApp li, .stApp small, .stApp summary,
+    .stApp legend, .stApp th, .stApp td,
+    [data-testid="stMarkdownContainer"],
+    [data-testid="stWidgetLabel"],
+    [data-testid="stMetricLabel"],
+    [data-testid="stMetricValue"],
+    [data-testid="stExpander"] summary {
+        color: var(--institucional-tinta);
+    }
+    [data-testid="stCaptionContainer"],
+    [data-testid="stCaptionContainer"] p {
+        color: var(--institucional-suave) !important;
+    }
+    [data-testid="stMetricValue"] {font-size: 1.55rem;}
+    .stApp a {
+        color: var(--institucional-verde);
+        text-decoration-color: var(--institucional-verde-acento);
+        text-underline-offset: .16em;
+    }
+    .stApp a:hover {color: var(--institucional-verde-oscuro);}
+    .stButton > button,
+    .stDownloadButton > button {
+        border-color: var(--institucional-verde);
+        color: var(--institucional-verde);
+    }
+    .stButton > button:hover,
+    .stDownloadButton > button:hover {
+        border-color: var(--institucional-verde-oscuro);
+        color: var(--institucional-verde-oscuro);
+    }
+    .stButton > button[kind="primary"],
+    .stDownloadButton > button[kind="primary"] {
+        border-color: var(--institucional-verde);
+        background: var(--institucional-verde);
+        color: #ffffff;
+    }
+    .stButton > button[kind="primary"] *,
+    .stDownloadButton > button[kind="primary"] * {
+        color: #ffffff !important;
+    }
+    .stButton > button[kind="primary"]:hover,
+    .stDownloadButton > button[kind="primary"]:hover {
+        border-color: var(--institucional-verde-oscuro);
+        background: var(--institucional-verde-oscuro);
+    }
     [data-testid="stSidebar"] {border-right: 1px solid var(--institucional-borde);}
     [data-testid="stSidebar"] > div:first-child {background: #ffffff;}
     [data-testid="stSidebar"] * {overflow-wrap: anywhere;}
@@ -77,7 +124,7 @@ st.markdown(
     button:focus-visible, [role="button"]:focus-visible,
     input:focus-visible, select:focus-visible, textarea:focus-visible,
     .leyenda-info:focus-visible {
-        outline: 3px solid #9b6a08;
+        outline: 3px solid var(--institucional-verde);
         outline-offset: 2px;
     }
     .cabecera-app {
@@ -144,8 +191,8 @@ st.markdown(
         font-weight: 750;
     }
     .flujo-paso.completado {
-        border-color: #91aa97;
-        background: #f4f8f4;
+        border-color: #8dbeae;
+        background: #f2f8f5;
     }
     .flujo-paso.completado .flujo-numero {
         border-color: var(--institucional-verde);
@@ -155,7 +202,7 @@ st.markdown(
     .flujo-paso.actual {
         border: 2px solid var(--institucional-verde);
         background: var(--institucional-verde-claro);
-        box-shadow: 0 3px 10px rgba(33, 75, 50, .09);
+        box-shadow: 0 3px 10px rgba(0, 84, 77, .09);
     }
     .flujo-paso.actual .flujo-numero {
         border-color: var(--institucional-verde);
@@ -357,7 +404,7 @@ st.markdown(
     }
     .leyenda-detalle summary::-webkit-details-marker {display: none;}
     .leyenda-detalle summary:focus-visible {
-        outline: 3px solid rgba(47, 99, 56, .35);
+        outline: 3px solid rgba(0, 84, 77, .35);
         outline-offset: 2px;
         border-radius: .2rem;
     }
@@ -368,7 +415,7 @@ st.markdown(
         height: 1.55rem;
         border: 1.5px solid currentColor;
         border-radius: 50%;
-        color: #2f6338;
+        color: var(--institucional-verde);
         background: #ffffff;
         font-size: .88rem;
         font-weight: 700;
@@ -379,15 +426,15 @@ st.markdown(
     .leyenda-detalle summary:hover .leyenda-info,
     .leyenda-detalle[open] .leyenda-info {
         color: #ffffff;
-        background: #2f6338;
+        background: var(--institucional-verde);
     }
     .leyenda-ayuda {
         margin: .35rem 0 .55rem;
         padding: .5rem .65rem;
-        border-left: 3px solid #2f6338;
+        border-left: 3px solid var(--institucional-verde);
         border-radius: 0 .2rem .2rem 0;
-        background: #eef4ed;
-        color: #27352b;
+        background: var(--institucional-verde-claro);
+        color: var(--institucional-verde);
         font-size: .84rem;
         line-height: 1.45;
     }
@@ -435,7 +482,7 @@ st.markdown(
         gap: 1rem;
         padding: .65rem .85rem;
         margin: .25rem 0 .55rem;
-        border: 1px solid rgba(23,53,31,.28);
+        border: 1px solid rgba(0,84,77,.28);
         border-radius: .2rem;
         background: var(--institucional-verde-claro);
         color: var(--institucional-verde);
@@ -471,7 +518,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "UX-0.2.5"
+APP_VERSION = "UX-0.2.6"
 METHODOLOGY_VERSION = "MT-2026.3"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 

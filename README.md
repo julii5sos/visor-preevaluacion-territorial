@@ -7,7 +7,7 @@ cumplimiento EUDR.
 
 ## Versión actual
 
-La versión principal de la nueva experiencia es **v0.2.5**. El historial completo
+La versión principal de la nueva experiencia es **v0.2.6**. El historial completo
 de mejoras y correcciones está disponible en [CHANGELOG.md](CHANGELOG.md), y el
 método reproducible se documenta en [METODOLOGIA.md](METODOLOGIA.md). La
 correspondencia con el visor original de Google Earth Engine está registrada en

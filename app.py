@@ -53,6 +53,14 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+    :root {
+        --natura-verde: #00544d;
+        --natura-verde-oscuro: #00403a;
+        --natura-verde-acento: #76b72a;
+        --natura-verde-claro: #eaf4f0;
+        --natura-verde-suave: #356b61;
+        --natura-borde: #b6d1c8;
+    }
     .block-container {padding-top: 1.25rem; padding-bottom: 2rem; max-width: 1500px;}
     [data-testid="stMetricValue"] {font-size: 1.8rem;}
     [data-testid="stSidebar"] * {overflow-wrap: anywhere;}
@@ -61,21 +69,21 @@ st.markdown(
     .cabecera-app {
         padding: 1.25rem 1.4rem;
         border-radius: .8rem;
-        background: linear-gradient(135deg, #17351f 0%, #2f6338 100%);
+        background: linear-gradient(135deg, var(--natura-verde-oscuro) 0%, var(--natura-verde) 100%);
         color: white;
         margin-bottom: 1rem;
     }
     .cabecera-app h1 {margin: 0; font-size: 2rem; line-height: 1.15; color: white;}
-    .cabecera-app p {margin: .55rem 0 0; color: #e8f2e7; max-width: 950px;}
+    .cabecera-app p {margin: .55rem 0 0; color: #eaf4f0; max-width: 950px;}
     .paso-guia {
         padding: .75rem .9rem;
-        border-left: 4px solid #3f7d44;
-        background: #f4f8f2;
+        border-left: 4px solid var(--natura-verde-acento);
+        background: var(--natura-verde-claro);
         border-radius: 0 .5rem .5rem 0;
         margin: .35rem 0 .85rem;
     }
     .tarjeta-resumen {
-        border: 1px solid rgba(47,99,56,.25);
+        border: 1px solid var(--natura-borde);
         border-radius: .65rem;
         padding: .85rem 1rem;
         background: #fbfdf9;
@@ -116,7 +124,7 @@ st.markdown(
     }
     .leyenda-detalle summary::-webkit-details-marker {display: none;}
     .leyenda-detalle summary:focus-visible {
-        outline: 3px solid rgba(47, 99, 56, .35);
+        outline: 3px solid rgba(0, 84, 77, .35);
         outline-offset: 2px;
         border-radius: .2rem;
     }
@@ -127,7 +135,7 @@ st.markdown(
         height: 1.55rem;
         border: 1.5px solid currentColor;
         border-radius: 50%;
-        color: #2f6338;
+        color: var(--natura-verde);
         background: #ffffff;
         font-size: .88rem;
         font-weight: 700;
@@ -138,15 +146,15 @@ st.markdown(
     .leyenda-detalle summary:hover .leyenda-info,
     .leyenda-detalle[open] .leyenda-info {
         color: #ffffff;
-        background: #2f6338;
+        background: var(--natura-verde);
     }
     .leyenda-ayuda {
         margin: .35rem 0 .55rem;
         padding: .5rem .65rem;
-        border-left: 3px solid #2f6338;
+        border-left: 3px solid var(--natura-verde);
         border-radius: 0 .2rem .2rem 0;
-        background: #eef4ed;
-        color: #27352b;
+        background: var(--natura-verde-claro);
+        color: var(--natura-verde);
         font-size: .84rem;
         line-height: 1.45;
     }
@@ -156,7 +164,7 @@ st.markdown(
         gap: .75rem;
         min-height: 52px;
         padding: .55rem .7rem;
-        border: 1px solid rgba(47,99,56,.25);
+        border: 1px solid var(--natura-borde);
         border-radius: .45rem;
         background: #fbfdf9;
     }
@@ -175,7 +183,7 @@ st.markdown(
         min-width: 0;
     }
     .ndvi-metodo-rango {
-        color: #56635a;
+        color: var(--natura-verde-suave);
         font-variant-numeric: tabular-nums;
     }
     @media (prefers-reduced-motion: reduce) {
@@ -193,10 +201,10 @@ st.markdown(
         gap: 1rem;
         padding: .65rem .85rem;
         margin: .25rem 0 .55rem;
-        border: 1px solid rgba(23,53,31,.28);
+        border: 1px solid rgba(0,84,77,.28);
         border-radius: .55rem;
-        background: #f4f8f2;
-        color: #17351f;
+        background: var(--natura-verde-claro);
+        color: var(--natura-verde);
     }
     .comparador-anios span:last-child {text-align: right;}
     </style>
@@ -209,7 +217,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "1.3.3"
+APP_VERSION = "1.3.4"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
 ASSET_CUENCA = (
