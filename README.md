@@ -7,7 +7,7 @@ cumplimiento EUDR.
 
 ## Versión actual
 
-La versión principal de la nueva experiencia es **v0.2.4**. El historial completo
+La versión principal de la nueva experiencia es **v0.2.5**. El historial completo
 de mejoras y correcciones está disponible en [CHANGELOG.md](CHANGELOG.md), y el
 método reproducible se documenta en [METODOLOGIA.md](METODOLOGIA.md). La
 correspondencia con el visor original de Google Earth Engine está registrada en
@@ -16,17 +16,19 @@ correspondencia con el visor original de Google Earth Engine está registrada en
 ## Flujo para el usuario
 
 1. Seleccionar una finca, dibujar un polígono o, para un resumen regional, toda la cuenca.
-2. Elegir un objetivo de revisión:
-   - panorama general;
-   - cambios de uso del suelo;
-   - condición de la vegetación;
-   - exploración personalizada.
+2. Elegir qué mapas desea ver primero:
+   - panorama forestal;
+   - uso del suelo;
+   - vegetación;
+   - exploración visual personalizada.
 3. Pulsar **Ejecutar análisis**.
 4. Revisar la lectura sencilla, el detalle técnico y los mapas.
 5. Descargar el informe PDF con seis mapas temáticos.
 
-Los períodos y las capas recomendadas se configuran automáticamente. Los controles
-técnicos permanecen disponibles en **Configuración avanzada**.
+La vista elegida no cambia el cálculo: únicamente organiza el comparador y las
+capas que aparecen primero. La referencia metodológica es 2025; se utilizan JRC
+2025, Hansen 2025 y ESRI 2017-2024, última serie disponible. Los años del modo
+técnico modifican solamente la visualización de los mapas.
 
 En el mapa interactivo las capas temáticas se seleccionan de una en una: al
 activar otra, la anterior se apaga automáticamente. La opción **Sin capa

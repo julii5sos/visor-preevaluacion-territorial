@@ -2,7 +2,7 @@
 
 **Versión del método:** MT-2026.3
 
-**Versión de implementación auditada:** UX-0.2.4
+**Versión de implementación auditada:** UX-0.2.5
 
 ## Finalidad y alcance
 
@@ -24,6 +24,22 @@ determinación de cumplimiento EUDR.
 Cada producto se procesa en su propia proyección y resolución. Las superficies se
 calculan dentro del área seleccionada y se integran como evidencia por fuente; no se
 fuerzan coincidencias píxel a píxel entre productos.
+
+## Períodos fijos y controles visuales
+
+La referencia metodológica del diagnóstico es **2025**. Para que todas las áreas
+sean comparables, el cálculo usa períodos fijos:
+
+- JRC Tropical Moist Forest: diagnóstico 2025.
+- Hansen Global Forest Change: edición 2025 y pérdidas posteriores al 31/12/2020.
+- ESRI Land Use/Land Cover: transición 2017-2024, porque 2024 es la última
+  anualidad disponible en la serie utilizada.
+- GEDI: producto estructural configurado en la metodología.
+- NDVI: evidencia visual hasta 2025 y aporte 0.0 al índice.
+
+Los años que el usuario selecciona en el modo técnico modifican únicamente el
+comparador, los mapas interactivos y las imágenes cartográficas. No cambian los
+períodos fijos usados para calcular señales, puntaje o prioridad.
 
 Para JRC TMF se calculan las seis clases anuales: bosque estable, degradación,
 deforestación, recuperación, agua y otra cobertura. Las seis se muestran en las

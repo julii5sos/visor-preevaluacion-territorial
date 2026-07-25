@@ -34,6 +34,7 @@ from metodologia_indice import (
     CLASES_VIGOR_NDVI,
     JUSTIFICACION_PESOS,
     JUSTIFICACION_UMBRALES,
+    PERIODOS_ANALISIS,
     PESOS_INDICE,
     PUNTAJE_MAXIMO,
     REGLAS_CONSISTENCIA,
@@ -470,7 +471,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "UX-0.2.4"
+APP_VERSION = "UX-0.2.5"
 METHODOLOGY_VERSION = "MT-2026.3"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
@@ -493,12 +494,13 @@ GEDI_ASSET = (
     "CanopyHeight_GEDI_V27"
 )
 
-ANO_HANSEN_MAX = 2025
-ANO_TMF_MAX = 2025
-ANO_DIAG_TMF = ANO_TMF_MAX
-ANO_ESRI_MIN = 2017
-ANO_ESRI_MAX = 2024
-ANO_NDVI_MAX = 2025
+ANO_REFERENCIA_ANALISIS = PERIODOS_ANALISIS["referencia"]
+ANO_HANSEN_MAX = PERIODOS_ANALISIS["hansen_diagnostico"]
+ANO_TMF_MAX = PERIODOS_ANALISIS["jrc_diagnostico"]
+ANO_DIAG_TMF = PERIODOS_ANALISIS["jrc_diagnostico"]
+ANO_ESRI_MIN = PERIODOS_ANALISIS["esri_inicial"]
+ANO_ESRI_MAX = PERIODOS_ANALISIS["esri_final"]
+ANO_NDVI_MAX = PERIODOS_ANALISIS["ndvi_final_visual"]
 CUTOFF_YEAR = 20
 CUTOFF_LABEL = "31/12/2020"
 
@@ -574,8 +576,8 @@ VIS_NDVI_CLASES = {
 VIS_RGB = {"min": 150, "max": 3200, "gamma": 1.15, "bands": ["B4", "B3", "B2"]}
 
 PERFILES_VISUALIZACION = {
-    "Panorama general (recomendado)": {
-        "descripcion": "Reúne las principales señales de bosque y pérdida arbórea.",
+    "Panorama forestal (vista recomendada)": {
+        "descripcion": "Abre primero el comparador JRC y las capas forestales principales.",
         "comparador": "JRC TMF",
         "capas": [
             "Pérdida Hansen post-2020",
@@ -583,18 +585,18 @@ PERFILES_VISUALIZACION = {
             "Degradación JRC",
         ],
     },
-    "Cambios de uso del suelo": {
-        "descripcion": "Compara árboles, cultivos, pastizales y otras coberturas.",
+    "Vista de uso del suelo": {
+        "descripcion": "Abre primero la comparación visual de coberturas ESRI.",
         "comparador": "ESRI LULC",
         "capas": ["Uso y cobertura ESRI", "Transiciones ESRI"],
     },
-    "Condición de la vegetación": {
-        "descripcion": "Muestra vigor vegetal, cambios recientes y altura del dosel.",
+    "Vista de vegetación": {
+        "descripcion": "Abre primero los mapas de NDVI y altura del dosel.",
         "comparador": "Sin comparador",
         "capas": ["Altura GEDI", "ΔNDVI", "Vegetación NDVI"],
     },
-    "Exploración personalizada": {
-        "descripcion": "Permite elegir cada fuente, capa y período de análisis.",
+    "Exploración visual personalizada": {
+        "descripcion": "Permite elegir comparador, capas y años del mapa sin cambiar el cálculo.",
         "comparador": "JRC TMF",
         "capas": ["Pérdida Hansen post-2020"],
     },
@@ -667,9 +669,13 @@ def construir_registro_metodologico(
     tipo_area,
     finca_id,
     geometria_geojson,
-    anio_esri_inicial,
-    anio_esri_final,
-    anio_ndvi_inicial,
+    anio_tmf_visual_inicial,
+    anio_tmf_visual_final,
+    anio_esri_visual_inicial,
+    anio_esri_visual_final,
+    anio_ndvi_visual_inicial,
+    modo_comparador,
+    capas_activas,
     resultados=None,
 ):
     if tipo_area == "Finca de monitoreo":
@@ -692,11 +698,23 @@ def construir_registro_metodologico(
         "metodologia": METHODOLOGY_VERSION,
         "area": especificacion_area,
         "periodos": {
-            "jrc_diagnostico": ANO_DIAG_TMF,
-            "esri_inicial": anio_esri_inicial,
-            "esri_final": anio_esri_final,
-            "ndvi_inicial": anio_ndvi_inicial,
-            "ndvi_final": ANO_NDVI_MAX,
+            "referencia_metodologica": ANO_REFERENCIA_ANALISIS,
+            "diagnostico_fijo": {
+                "jrc": ANO_DIAG_TMF,
+                "hansen": ANO_HANSEN_MAX,
+                "esri_inicial": ANO_ESRI_MIN,
+                "esri_final": ANO_ESRI_MAX,
+            },
+            "visualizacion": {
+                "comparador": modo_comparador,
+                "jrc_inicial": anio_tmf_visual_inicial,
+                "jrc_final": anio_tmf_visual_final,
+                "esri_inicial": anio_esri_visual_inicial,
+                "esri_final": anio_esri_visual_final,
+                "ndvi_inicial": anio_ndvi_visual_inicial,
+                "ndvi_final": ANO_NDVI_MAX,
+                "capas_disponibles": list(capas_activas),
+            },
             "corte_referencia": CUTOFF_LABEL,
         },
         "fuentes": [
@@ -1789,7 +1807,21 @@ def generar_pdf(
         [Paragraph("Área evaluada", estilos["CuerpoFicha"]), Paragraph(nombre_area, estilos["CuerpoFicha"])],
         [Paragraph("Superficie total", estilos["CuerpoFicha"]), Paragraph(f"{area:,.2f} ha", estilos["CuerpoFicha"])],
         [Paragraph("Fecha del análisis", estilos["CuerpoFicha"]), Paragraph(date.today().strftime("%d/%m/%Y"), estilos["CuerpoFicha"])],
-        [Paragraph("Períodos principales", estilos["CuerpoFicha"]), Paragraph(f"JRC diagnóstico {anio_tmf_diagnostico} | ESRI {anio_esri_inicial}-{anio_esri_final} | NDVI {anio_ndvi_inicial}-{ANO_NDVI_MAX}", estilos["CuerpoFicha"])],
+        [
+            Paragraph("Referencia metodológica", estilos["CuerpoFicha"]),
+            Paragraph(
+                f"{ANO_REFERENCIA_ANALISIS} (JRC y Hansen); ESRI "
+                f"{anio_esri_inicial}-{anio_esri_final}, última serie disponible",
+                estilos["CuerpoFicha"],
+            ),
+        ],
+        [
+            Paragraph("Apoyo visual", estilos["CuerpoFicha"]),
+            Paragraph(
+                f"NDVI {anio_ndvi_inicial}-{ANO_NDVI_MAX}; no modifica el índice",
+                estilos["CuerpoFicha"],
+            ),
+        ],
         [
             Paragraph("Metodología aplicada", estilos["CuerpoFicha"]),
             Paragraph(
@@ -2117,7 +2149,7 @@ def generar_pdf(
 def mostrar_flujo(paso_actual, contenedor=None):
     pasos = [
         ("Área", "Seleccione la unidad territorial."),
-        ("Enfoque", "Elija qué desea revisar."),
+        ("Vista", "Elija qué mapas ver primero."),
         ("Resultados", "Ejecute y lea las señales."),
         ("Evidencia", "Explore mapas y descargue."),
     ]
@@ -2738,14 +2770,23 @@ try:
             )
 
     st.sidebar.markdown("---")
-    st.sidebar.caption("Paso 2 de 2 · Seleccione el enfoque")
+    st.sidebar.caption("Paso 2 de 2 · Elija una vista inicial")
     objetivo = st.sidebar.selectbox(
-        "¿Qué desea revisar?",
+        "¿Qué mapas desea ver primero?",
         list(PERFILES_VISUALIZACION),
-        help="Cada opción activa automáticamente las capas más útiles para ese objetivo.",
+        help=(
+            "Solo organiza el comparador y las capas que se muestran primero. "
+            "El cálculo científico es el mismo en todas las opciones."
+        ),
     )
     perfil = PERFILES_VISUALIZACION[objetivo]
     st.sidebar.caption(perfil["descripcion"])
+    st.sidebar.info(
+        f"El cálculo no cambia con esta selección. Referencia metodológica "
+        f"{ANO_REFERENCIA_ANALISIS}: JRC y Hansen {ANO_REFERENCIA_ANALISIS}; "
+        f"ESRI {ANO_ESRI_MIN}-{ANO_ESRI_MAX}, última serie disponible. "
+        "Los años configurables son únicamente para visualizar comparaciones."
+    )
 
     opciones_capas = [
         "Pérdida Hansen post-2020",
@@ -2780,27 +2821,31 @@ try:
 
     with st.sidebar.expander("Modo técnico · parámetros y capas", expanded=False):
         personalizar = st.checkbox(
-            "Modificar la configuración recomendada",
-            value=objetivo == "Exploración personalizada",
+            "Elegir manualmente comparador y mapas",
+            value=objetivo == "Exploración visual personalizada",
         )
         if personalizar:
-            st.warning(
-                "Los cambios se registrarán en la ficha metodológica para conservar la trazabilidad."
+            st.info(
+                "Los selectores de años de esta sección solo cambian los mapas y el "
+                "barrido visual. No modifican los períodos fijos del diagnóstico."
             )
             modo_comparador = st.selectbox(
-                "Comparación principal:",
+                "Comparador visual:",
                 ["JRC TMF", "ESRI LULC", "Sin comparador"],
                 index=["JRC TMF", "ESRI LULC", "Sin comparador"].index(modo_comparador),
-                help="JRC compara el estado del bosque; ESRI compara el uso y la cobertura del suelo.",
+                help=(
+                    "JRC compara visualmente el estado del bosque; ESRI compara el uso "
+                    "y la cobertura del suelo. La elección no modifica el índice."
+                ),
             )
             if modo_comparador == "JRC TMF":
                 anio_tmf_inicial = st.selectbox(
-                    "Año inicial del bosque:",
+                    "Año inicial para visualizar (JRC):",
                     list(range(1990, ANO_TMF_MAX)),
                     index=list(range(1990, ANO_TMF_MAX)).index(2020),
                 )
                 anio_tmf_final = st.selectbox(
-                    "Año final del bosque:",
+                    "Año final para visualizar (JRC):",
                     list(range(anio_tmf_inicial + 1, ANO_TMF_MAX + 1)),
                     index=len(list(range(anio_tmf_inicial + 1, ANO_TMF_MAX + 1))) - 1,
                 )
@@ -2810,11 +2855,11 @@ try:
                 )
             if modo_comparador == "ESRI LULC":
                 anio_esri_inicial = st.selectbox(
-                    "Año inicial del uso del suelo:",
+                    "Año inicial para visualizar (ESRI):",
                     list(range(ANO_ESRI_MIN, ANO_ESRI_MAX)),
                 )
                 anio_esri_final = st.selectbox(
-                    "Año final del uso del suelo:",
+                    "Año final para visualizar (ESRI):",
                     list(range(anio_esri_inicial + 1, ANO_ESRI_MAX + 1)),
                     index=len(list(range(anio_esri_inicial + 1, ANO_ESRI_MAX + 1))) - 1,
                 )
@@ -2829,27 +2874,39 @@ try:
                 ),
             )
             anio_ndvi_inicial = st.selectbox(
-                "Año inicial del cambio vegetal:",
+                "Año inicial para visualizar el cambio NDVI:",
                 list(range(2017, ANO_NDVI_MAX)),
                 index=list(range(2017, ANO_NDVI_MAX)).index(2022),
                 disabled="ΔNDVI" not in capas_activas,
             )
         else:
             st.caption(
-                f"Períodos recomendados: JRC 2020-{ANO_TMF_MAX}, "
-                f"ESRI {ANO_ESRI_MIN}-{ANO_ESRI_MAX} y NDVI 2022-{ANO_NDVI_MAX}."
+                f"Vista recomendada: JRC 2020-{ANO_TMF_MAX}, "
+                f"ESRI {ANO_ESRI_MIN}-{ANO_ESRI_MAX} y NDVI 2022-{ANO_NDVI_MAX}. "
+                "Estos períodos corresponden a los mapas, no al cálculo."
             )
 
-    firma_actual = (
+    firma_analisis_actual = (
         tipo_area,
         finca_seleccionada,
         ANO_DIAG_TMF,
+        ANO_ESRI_MIN,
+        ANO_ESRI_MAX,
+        geometria_dibujada_json,
+    )
+    firma_visual_actual = (
+        firma_analisis_actual,
+        modo_comparador,
+        anio_tmf_inicial,
+        anio_tmf_final,
         anio_esri_inicial,
         anio_esri_final,
         anio_ndvi_inicial,
-        geometria_dibujada_json,
+        tuple(capas_activas),
     )
-    analisis_actual = st.session_state.get("firma_analisis") == firma_actual
+    analisis_actual = (
+        st.session_state.get("firma_analisis") == firma_analisis_actual
+    )
     flujo_contenedor = st.empty()
 
     st.markdown("### Selección actual")
@@ -2858,7 +2915,7 @@ try:
         <div class="contexto-analisis">
           <div class="contexto-item"><small>Área</small><strong>{html_lib.escape(nombre_area)}</strong></div>
           <div class="contexto-item"><small>Superficie</small><strong>{superficie_ha:,.1f} ha</strong></div>
-          <div class="contexto-item"><small>Enfoque</small><strong>{html_lib.escape(objetivo)}</strong></div>
+          <div class="contexto-item"><small>Vista inicial</small><strong>{html_lib.escape(objetivo)}</strong></div>
           <div class="contexto-item"><small>Configuración</small><strong>{'Personalizada' if personalizar else 'Recomendada'}</strong></div>
         </div>
         """,
@@ -2873,9 +2930,10 @@ try:
 
     st.markdown(
         f"""
-        <div class="paso-guia"><b>Configuración lista.</b> El análisis utilizará el método
-        <b>{METHODOLOGY_VERSION}</b>. Pulse <b>Ejecutar análisis</b>; después revise primero el
-        resumen y luego la evidencia cartográfica.</div>
+        <div class="paso-guia"><b>Configuración lista.</b> La vista elegida solo organiza
+        los mapas. El cálculo utilizará el mismo método <b>{METHODOLOGY_VERSION}</b> con
+        referencia <b>{ANO_REFERENCIA_ANALISIS}</b>. Pulse <b>Ejecutar análisis</b> y revise
+        después la evidencia cartográfica.</div>
         """,
         unsafe_allow_html=True,
     )
@@ -2897,7 +2955,9 @@ try:
     st.caption(
         "Primero se calcularán únicamente las señales y el resumen. El informe con seis mapas "
         "se preparará después, solo si usted lo solicita. "
-        f"JRC TMF {ANO_DIAG_TMF} permanece fijo para comparar todas las áreas con el mismo criterio."
+        f"Referencia fija {ANO_REFERENCIA_ANALISIS}: JRC y Hansen "
+        f"{ANO_REFERENCIA_ANALISIS}, con ESRI {ANO_ESRI_MIN}-{ANO_ESRI_MAX}. "
+        "Los años elegidos en el modo técnico solo modifican la visualización."
     )
     entregables_contenedor = st.empty()
     if not analisis_actual:
@@ -2914,50 +2974,56 @@ try:
                 tipo_area,
                 finca_seleccionada,
                 ANO_DIAG_TMF,
-                anio_esri_inicial,
-                anio_esri_final,
+                ANO_ESRI_MIN,
+                ANO_ESRI_MAX,
                 geometria_dibujada_json,
             )
             st.session_state["resultados_analisis"] = resultados_nuevos
-            st.session_state["firma_analisis"] = firma_actual
-            if firma_anterior != firma_actual:
+            st.session_state["firma_analisis"] = firma_analisis_actual
+            if firma_anterior != firma_analisis_actual:
                 st.session_state.pop("pdf_analisis", None)
                 st.session_state.pop("firma_informe", None)
                 st.session_state.pop("errores_mapas", None)
                 st.session_state.pop("intento_informe", None)
                 st.session_state.pop("mapas_reporte", None)
 
-    analisis_actual = st.session_state.get("firma_analisis") == firma_actual
+    analisis_actual = (
+        st.session_state.get("firma_analisis") == firma_analisis_actual
+    )
     mostrar_flujo(4 if analisis_actual else 3, flujo_contenedor)
     if analisis_actual:
         entregables_contenedor.empty()
 
-    if st.session_state.get("firma_analisis") == firma_actual:
+    if st.session_state.get("firma_analisis") == firma_analisis_actual:
         resultados = st.session_state["resultados_analisis"]
         mostrar_resultados(
             resultados,
             ANO_DIAG_TMF,
-            anio_esri_inicial,
-            anio_esri_final,
+            ANO_ESRI_MIN,
+            ANO_ESRI_MAX,
         )
         registro_resultados = construir_registro_metodologico(
-            tipo_area,
-            finca_seleccionada,
-            geometria_dibujada_json,
-            anio_esri_inicial,
-            anio_esri_final,
-            anio_ndvi_inicial,
-            resultados,
+            tipo_area=tipo_area,
+            finca_id=finca_seleccionada,
+            geometria_geojson=geometria_dibujada_json,
+            anio_tmf_visual_inicial=anio_tmf_inicial,
+            anio_tmf_visual_final=anio_tmf_final,
+            anio_esri_visual_inicial=anio_esri_inicial,
+            anio_esri_visual_final=anio_esri_final,
+            anio_ndvi_visual_inicial=anio_ndvi_inicial,
+            modo_comparador=modo_comparador,
+            capas_activas=capas_activas,
+            resultados=resultados,
         )
         nombre_archivo = re.sub(r"[^A-Za-z0-9_-]+", "_", nombre_area).strip("_").lower()
         columna_pdf, columna_metodo = st.columns(2)
         informe_actual = (
-            st.session_state.get("firma_informe") == firma_actual
+            st.session_state.get("firma_informe") == firma_visual_actual
             and st.session_state.get("pdf_analisis")
         )
         errores_informe = (
             st.session_state.get("errores_mapas", [])
-            if st.session_state.get("firma_informe") == firma_actual
+            if st.session_state.get("firma_informe") == firma_visual_actual
             else []
         )
         if not informe_actual or errores_informe:
@@ -3013,14 +3079,14 @@ try:
                         )
                         st.session_state["errores_mapas"] = errores_mapas
                         st.session_state["mapas_reporte"] = mapas_reporte
-                        st.session_state["firma_informe"] = firma_actual
+                        st.session_state["firma_informe"] = firma_visual_actual
                         if disponibles:
                             st.session_state["pdf_analisis"] = generar_pdf(
                                 nombre_area,
                                 resultados,
                                 ANO_DIAG_TMF,
-                                anio_esri_inicial,
-                                anio_esri_final,
+                                ANO_ESRI_MIN,
+                                ANO_ESRI_MAX,
                                 anio_ndvi_inicial,
                                 mapas_reporte,
                             )
@@ -3082,7 +3148,7 @@ try:
             help="Contiene fuentes, períodos, umbrales, pesos, reglas y el resumen del resultado.",
         )
 
-        if st.session_state.get("firma_informe") == firma_actual:
+        if st.session_state.get("firma_informe") == firma_visual_actual:
             errores_mapas = st.session_state.get("errores_mapas", [])
             if errores_mapas:
                 disponibles = 6 - len(errores_mapas)
@@ -3443,8 +3509,10 @@ try:
                 )
             )
             st.caption(
-                "Los años del comparador JRC cambian la visualización; el diagnóstico permanece fijo "
-                f"en {ANO_DIAG_TMF} para asegurar comparabilidad."
+                "Todos los años seleccionables cambian únicamente la visualización. "
+                f"El diagnóstico conserva la referencia {ANO_REFERENCIA_ANALISIS}: JRC y "
+                f"Hansen {ANO_REFERENCIA_ANALISIS}, y ESRI {ANO_ESRI_MIN}-{ANO_ESRI_MAX} "
+                "por ser la última serie disponible."
             )
             st.markdown("**Lectura de consistencia entre fuentes**")
             st.markdown(
