@@ -4,6 +4,7 @@ from metodologia_indice import (
     PESOS_INDICE,
     PUNTAJE_MAXIMO,
     calcular_indice_prioridad,
+    evaluar_consistencia,
     evaluar_senales,
 )
 
@@ -118,6 +119,50 @@ class IndicePrioridadTest(unittest.TestCase):
         )
         self.assertFalse(disponible)
         self.assertFalse(senales["gedi"])
+
+    def consistencia(self, **cambios):
+        valores = {
+            "senal_tmf": False,
+            "senal_hansen": False,
+            "senal_esri": False,
+            "tmf_recuperacion_ha": 0.0,
+            "tmf_recuperacion_pct": 0.0,
+            "esri_ganancia_arboles_ha": 0.0,
+            "esri_ganancia_arboles_pct": 0.0,
+        }
+        valores.update(cambios)
+        return evaluar_consistencia(**valores)
+
+    def test_consistencia_alta_requiere_tres_fuentes(self):
+        resultado = self.consistencia(
+            senal_tmf=True,
+            senal_hansen=True,
+            senal_esri=True,
+        )
+        self.assertEqual(resultado["nivel"], "Alta consistencia")
+        self.assertEqual(len(resultado["fuentes_deterioro"]), 3)
+
+    def test_consistencia_parcial_requiere_dos_fuentes(self):
+        resultado = self.consistencia(senal_tmf=True, senal_esri=True)
+        self.assertEqual(resultado["nivel"], "Consistencia parcial")
+
+    def test_lectura_mixta_no_compensa_deterioro_y_ganancia(self):
+        resultado = self.consistencia(
+            senal_tmf=True,
+            esri_ganancia_arboles_ha=0.10,
+            esri_ganancia_arboles_pct=5.0,
+        )
+        self.assertEqual(resultado["nivel"], "Lectura mixta")
+        self.assertTrue(resultado["fuentes_deterioro"])
+        self.assertTrue(resultado["fuentes_recuperacion"])
+
+    def test_ganancia_aislada_exige_umbral_completo(self):
+        resultado = self.consistencia(
+            senal_tmf=True,
+            esri_ganancia_arboles_ha=0.10,
+            esri_ganancia_arboles_pct=4.9,
+        )
+        self.assertEqual(resultado["nivel"], "Sin señal consistente")
 
 
 if __name__ == "__main__":

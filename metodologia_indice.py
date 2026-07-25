@@ -93,6 +93,13 @@ REGLAS_PRIORIDAD = {
     "baja": "puntaje < 0.5",
 }
 
+REGLAS_CONSISTENCIA = {
+    "alta": "JRC TMF, Hansen y ESRI presentan señal de deterioro",
+    "parcial": "exactamente dos de JRC TMF, Hansen y ESRI presentan señal",
+    "mixta": "coexisten señales de deterioro y de recuperación/ganancia",
+    "sin_senal": "menos de dos fuentes principales coinciden en deterioro",
+}
+
 
 def clasificar_prioridad(puntaje):
     """Clasifica un puntaje ya calculado sin alterar su valor."""
@@ -173,3 +180,81 @@ def calcular_indice_prioridad(
     }
     puntaje = round(sum(aportes.values()), 1)
     return aportes, puntaje, clasificar_prioridad(puntaje)
+
+
+def evaluar_consistencia(
+    *,
+    senal_tmf,
+    senal_hansen,
+    senal_esri,
+    tmf_recuperacion_ha,
+    tmf_recuperacion_pct,
+    esri_ganancia_arboles_ha,
+    esri_ganancia_arboles_pct,
+):
+    """Describe coincidencias entre fuentes sin modificar el índice.
+
+    La consistencia es una lectura complementaria. Las ganancias se filtran con
+    umbrales simétricos a los usados para deforestación JRC y transición ESRI,
+    de modo que un píxel o una fracción mínima no produzcan una lectura mixta.
+    """
+    deterioro = [
+        nombre
+        for nombre, activa in (
+            ("JRC TMF", bool(senal_tmf)),
+            ("Hansen GFC", bool(senal_hansen)),
+            ("ESRI LULC", bool(senal_esri)),
+        )
+        if activa
+    ]
+    recuperacion_tmf = (
+        tmf_recuperacion_ha >= UMBRALES_INDICE["jrc_deforestacion_ha"]
+        or tmf_recuperacion_pct >= UMBRALES_INDICE["jrc_deforestacion_pct"]
+    )
+    ganancia_esri = (
+        esri_ganancia_arboles_ha
+        >= UMBRALES_INDICE["esri_salida_arboles_ha"]
+        and esri_ganancia_arboles_pct
+        >= UMBRALES_INDICE["esri_salida_arboles_pct"]
+    )
+    recuperacion = [
+        nombre
+        for nombre, activa in (
+            ("JRC TMF (recuperación)", recuperacion_tmf),
+            ("ESRI LULC (ganancia de árboles)", ganancia_esri),
+        )
+        if activa
+    ]
+
+    if deterioro and recuperacion:
+        nivel = "Lectura mixta"
+        detalle = (
+            "El área contiene señales de deterioro y de recuperación o ganancia "
+            "arbórea. Revise su distribución espacial; no deben compensarse "
+            "numéricamente ni interpretarse como ausencia de cambio."
+        )
+    elif len(deterioro) == 3:
+        nivel = "Alta consistencia"
+        detalle = (
+            "JRC TMF, Hansen GFC y ESRI LULC presentan señales de deterioro. "
+            "Las fuentes se refuerzan, aunque no se exige coincidencia píxel a píxel."
+        )
+    elif len(deterioro) == 2:
+        nivel = "Consistencia parcial"
+        detalle = (
+            "Dos fuentes principales presentan señales de deterioro. La tercera "
+            "puede responder a otra definición, resolución o período."
+        )
+    else:
+        nivel = "Sin señal consistente"
+        detalle = (
+            "Menos de dos fuentes principales coinciden en deterioro. Mantenga "
+            "el monitoreo y revise individualmente cualquier señal aislada."
+        )
+
+    return {
+        "nivel": nivel,
+        "detalle": detalle,
+        "fuentes_deterioro": deterioro,
+        "fuentes_recuperacion": recuperacion,
+    }
