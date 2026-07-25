@@ -2,7 +2,7 @@
 
 **Documento de referencia:** `Visor_PreEvaluacion_Territorial_NATURA_Documentacion.docx`
 
-**Implementación Streamlit:** UX-0.2.4
+**Implementación Streamlit:** UX-0.2.5
 
 **Método:** MT-2026.3
 
@@ -17,7 +17,7 @@ su uso, pero las fuentes, las comparaciones y el diagnóstico permanecen disponi
 | Polígono dibujado por el usuario | Herramienta de dibujo y análisis del GeoJSON recortado a la cuenca |
 | Comparador visual JRC | Barrido sincronizado entre año inicial y final, con rótulos visibles |
 | Comparador visual ESRI | Barrido sincronizado entre año inicial y final |
-| Selección de años | Parámetros JRC, ESRI y NDVI disponibles en el modo técnico |
+| Selección de años | Controles visuales JRC, ESRI y NDVI; no alteran el diagnóstico fijo de referencia 2025 (ESRI 2017-2024) |
 | Capas temáticas | JRC, Hansen histórico y posterior a 2020, línea base, ESRI, GEDI y NDVI; selección exclusiva para impedir superposiciones accidentales |
 | Leyenda activa | Leyendas dependientes del comparador y de las capas seleccionadas |
 | JRC TMF | Seis clases, estadísticas, mapa, gráfico y señal ponderada |
