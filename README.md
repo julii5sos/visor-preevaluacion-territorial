@@ -7,7 +7,7 @@ cumplimiento EUDR.
 
 ## Versión actual
 
-La versión principal de la nueva experiencia es **v0.2.2**. El historial completo
+La versión principal de la nueva experiencia es **v0.2.3**. El historial completo
 de mejoras y correcciones está disponible en [CHANGELOG.md](CHANGELOG.md), y el
 método reproducible se documenta en [METODOLOGIA.md](METODOLOGIA.md). La
 correspondencia con el visor original de Google Earth Engine está registrada en
@@ -43,6 +43,10 @@ geometría resultante.
 - ESRI Land Use/Land Cover 2017-2024.
 - Altura del dosel basada en GEDI / OpenForis.
 - NDVI y cambio de NDVI derivados de Sentinel-2.
+
+La metodología muestra permanentemente los cinco intervalos de vigor NDVI. Cada
+clase dispone de un botón de información que explica su lectura y advierte que el
+NDVI describe vigor espectral, no un tipo de cobertura.
 
 El cálculo de superficies se realiza por fuente en su resolución de trabajo: ESRI a
 10 m, JRC y Hansen aproximadamente a 30 m, y el producto de altura a su escala de

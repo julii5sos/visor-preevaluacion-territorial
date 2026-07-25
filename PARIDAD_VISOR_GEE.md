@@ -2,8 +2,9 @@
 
 **Documento de referencia:** `Visor_PreEvaluacion_Territorial_NATURA_Documentacion.docx`
 
-**Implementación Streamlit:** UX-0.2.2
-**Método:** MT-2026.2
+**Implementación Streamlit:** UX-0.2.3
+
+**Método:** MT-2026.3
 
 Esta matriz verifica que la migración a Python, Streamlit y GitHub conserve las
 funciones descritas para el visor original. La interfaz se reorganiza para facilitar

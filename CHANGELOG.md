@@ -4,7 +4,20 @@ Este historial documenta la evolución de la aplicación UX. Las versiones sigue
 el formato `MAJOR.MINOR.PATCH`: una versión principal, mejoras compatibles y
 correcciones compatibles, respectivamente.
 
-## [0.2.2] - 2026-07-24 — versión actual
+## [0.2.3] - 2026-07-24 — versión actual
+
+### Lectura del vigor vegetal
+
+- La metodología muestra los cinco intervalos numéricos de NDVI junto a su clase
+  de vigor vegetal.
+- Cada clase dispone de una ayuda nativa y accesible que se abre mediante
+  pulsación o teclado.
+- La escala y sus precauciones de interpretación se incorporaron al PDF y al
+  registro metodológico JSON.
+- La leyenda activa conserva los intervalos visibles sin depender únicamente del
+  color.
+
+## [0.2.2] - 2026-07-24
 
 ### Correspondencia con el visor original
 
