@@ -7,9 +7,11 @@ cumplimiento EUDR.
 
 ## Versión actual
 
-La versión principal de la nueva experiencia es **v0.2.1**. El historial completo
+La versión principal de la nueva experiencia es **v0.2.2**. El historial completo
 de mejoras y correcciones está disponible en [CHANGELOG.md](CHANGELOG.md), y el
-método reproducible se documenta en [METODOLOGIA.md](METODOLOGIA.md).
+método reproducible se documenta en [METODOLOGIA.md](METODOLOGIA.md). La
+correspondencia con el visor original de Google Earth Engine está registrada en
+[PARIDAD_VISOR_GEE.md](PARIDAD_VISOR_GEE.md).
 
 ## Flujo para el usuario
 
@@ -19,7 +21,7 @@ método reproducible se documenta en [METODOLOGIA.md](METODOLOGIA.md).
    - cambios de uso del suelo;
    - condición de la vegetación;
    - exploración personalizada.
-3. Pulsar **Ejecutar preevaluación**.
+3. Pulsar **Ejecutar análisis**.
 4. Revisar la lectura sencilla, el detalle técnico y los mapas.
 5. Descargar el informe PDF con seis mapas temáticos.
 
@@ -65,12 +67,18 @@ El código centraliza pesos, umbrales, justificaciones y reglas en
 `metodologia_indice.py`; el informe PDF y el registro JSON muestran el aporte
 efectivo de cada fuente.
 
+La aplicación también informa la consistencia entre JRC, Hansen y ESRI como alta,
+parcial, mixta o sin señal consistente. Esta lectura no suma ni resta puntos:
+explica si las fuentes principales coinciden y si existen simultáneamente sectores
+con deterioro y con recuperación.
+
 ## Informe PDF
 
 La ficha utiliza tipografía Times e incluye:
 
 - identificación del área y períodos analizados;
 - prioridad y métricas principales;
+- consistencia entre fuentes y estadísticas Hansen anteriores y posteriores a 2020;
 - interpretación en lenguaje sencillo;
 - acción recomendada y conclusión;
 - mapas ESRI, JRC, Hansen, GEDI, cambio de NDVI y vigor vegetal;
@@ -130,6 +138,10 @@ territorial de `app.py`, pero con un recorrido pensado para usuarios no especial
 - mapas interactivos, informe PDF y registro metodológico JSON;
 - código de reproducibilidad para identificar cada configuración.
 
+El detalle técnico conserva las seis clases JRC, las transiciones ESRI, la cobertura
+arbórea persistente a 2020, las pérdidas Hansen antes y después del corte, GEDI y
+un gráfico del aporte ponderado por fuente.
+
 El registro metodológico documenta las fuentes, los períodos, las resoluciones de
 trabajo, los umbrales, los pesos y las reglas de prioridad. Esta trazabilidad permite
 repetir la configuración y auditar cómo se produjo el resultado, pero no convierte el
@@ -143,5 +155,6 @@ Para desplegarla como una aplicación independiente en Streamlit Community Cloud
 - los secretos `EE_PROJECT`, `EE_SERVICE_ACCOUNT_JSON`, `EE_ASSET_FINCAS` y
   `FINCAS_ACCESS_CODE` configurados en la aplicación.
 
-La aplicación existente continúa utilizando `app.py` y no se modifica al crear el
-nuevo despliegue.
+`app.py` y `app_experiencia.py` utilizan el mismo módulo metodológico y mantienen
+las mismas fuentes, umbrales, pesos y reglas de consistencia. La rama principal
+despliega `app_experiencia.py` como interfaz recomendada.
