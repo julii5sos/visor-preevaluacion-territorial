@@ -2,7 +2,7 @@
 
 **Documento de referencia:** `Visor_PreEvaluacion_Territorial_NATURA_Documentacion.docx`
 
-**Implementación Streamlit:** UX-0.2.3
+**Implementación Streamlit:** UX-0.2.4
 
 **Método:** MT-2026.3
 
@@ -18,7 +18,7 @@ su uso, pero las fuentes, las comparaciones y el diagnóstico permanecen disponi
 | Comparador visual JRC | Barrido sincronizado entre año inicial y final, con rótulos visibles |
 | Comparador visual ESRI | Barrido sincronizado entre año inicial y final |
 | Selección de años | Parámetros JRC, ESRI y NDVI disponibles en el modo técnico |
-| Capas temáticas | JRC, Hansen histórico y posterior a 2020, línea base, ESRI, GEDI y NDVI |
+| Capas temáticas | JRC, Hansen histórico y posterior a 2020, línea base, ESRI, GEDI y NDVI; selección exclusiva para impedir superposiciones accidentales |
 | Leyenda activa | Leyendas dependientes del comparador y de las capas seleccionadas |
 | JRC TMF | Seis clases, estadísticas, mapa, gráfico y señal ponderada |
 | Hansen GFC | Cobertura persistente a 2020, pérdida 2001-2020 y pérdida posterior a 2020 |

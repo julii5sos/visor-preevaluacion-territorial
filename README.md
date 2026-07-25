@@ -7,7 +7,7 @@ cumplimiento EUDR.
 
 ## Versión actual
 
-La versión principal de la nueva experiencia es **v0.2.3**. El historial completo
+La versión principal de la nueva experiencia es **v0.2.4**. El historial completo
 de mejoras y correcciones está disponible en [CHANGELOG.md](CHANGELOG.md), y el
 método reproducible se documenta en [METODOLOGIA.md](METODOLOGIA.md). La
 correspondencia con el visor original de Google Earth Engine está registrada en
@@ -27,6 +27,11 @@ correspondencia con el visor original de Google Earth Engine está registrada en
 
 Los períodos y las capas recomendadas se configuran automáticamente. Los controles
 técnicos permanecen disponibles en **Configuración avanzada**.
+
+En el mapa interactivo las capas temáticas se seleccionan de una en una: al
+activar otra, la anterior se apaga automáticamente. La opción **Sin capa
+temática** permite volver a la imagen satelital, y los límites permanecen
+disponibles en un control de referencias separado.
 
 ### Área dibujada
 
