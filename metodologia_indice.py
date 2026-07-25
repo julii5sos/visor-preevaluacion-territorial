@@ -86,6 +86,54 @@ JUSTIFICACION_PESOS = {
     ),
 }
 
+CLASES_VIGOR_NDVI = (
+    {
+        "color": "#B30000",
+        "etiqueta": "Sin vegetación activa",
+        "rango": "NDVI < 0",
+        "interpretacion": (
+            "No se observa una señal positiva de vegetación fotosintéticamente activa. "
+            "Puede corresponder a agua, sombra, nubes residuales o superficies no vegetadas."
+        ),
+    },
+    {
+        "color": "#F4A582",
+        "etiqueta": "Suelo o cobertura muy escasa",
+        "rango": "0.0 ≤ NDVI < 0.2",
+        "interpretacion": (
+            "Respuesta espectral baja, común en suelo desnudo, áreas construidas o "
+            "cobertura vegetal muy dispersa."
+        ),
+    },
+    {
+        "color": "#FFFFBF",
+        "etiqueta": "Vegetación escasa",
+        "rango": "0.2 ≤ NDVI < 0.4",
+        "interpretacion": (
+            "Cobertura vegetal poco densa o con vigor limitado. Puede incluir pastizales, "
+            "cultivos en etapas tempranas o vegetación estacional."
+        ),
+    },
+    {
+        "color": "#78C679",
+        "etiqueta": "Vegetación moderada",
+        "rango": "0.4 ≤ NDVI < 0.6",
+        "interpretacion": (
+            "Señal intermedia de actividad vegetal y cobertura. Debe compararse con la "
+            "época del año, el uso del suelo y las demás fuentes."
+        ),
+    },
+    {
+        "color": "#006837",
+        "etiqueta": "Vegetación densa",
+        "rango": "NDVI ≥ 0.6",
+        "interpretacion": (
+            "Señal alta de vegetación verde y densa. No demuestra por sí sola que la "
+            "cobertura sea bosque natural ni determina su condición legal."
+        ),
+    },
+)
+
 REGLAS_PRIORIDAD = {
     "alta": "puntaje >= 3.0",
     "media": "puntaje >= 1.5 y < 3.0",
