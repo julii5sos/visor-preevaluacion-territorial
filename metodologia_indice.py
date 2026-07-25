@@ -5,6 +5,15 @@ lugar los umbrales, los pesos y la clasificación de prioridad usados por las
 dos interfaces de la aplicación.
 """
 
+PERIODOS_ANALISIS = {
+    "referencia": 2025,
+    "jrc_diagnostico": 2025,
+    "hansen_diagnostico": 2025,
+    "esri_inicial": 2017,
+    "esri_final": 2024,
+    "ndvi_final_visual": 2025,
+}
+
 PESOS_INDICE = {
     "tmf": 2.0,
     "hansen": 2.0,

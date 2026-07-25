@@ -2,6 +2,7 @@ import unittest
 
 from metodologia_indice import (
     CLASES_VIGOR_NDVI,
+    PERIODOS_ANALISIS,
     PESOS_INDICE,
     PUNTAJE_MAXIMO,
     calcular_indice_prioridad,
@@ -26,6 +27,14 @@ class IndicePrioridadTest(unittest.TestCase):
         self.assertEqual(PESOS_INDICE["gedi"], 0.5)
         self.assertEqual(PESOS_INDICE["ndvi"], 0.0)
         self.assertEqual(PUNTAJE_MAXIMO, 6.0)
+
+    def test_periodos_del_diagnostico_son_fijos(self):
+        self.assertEqual(PERIODOS_ANALISIS["referencia"], 2025)
+        self.assertEqual(PERIODOS_ANALISIS["jrc_diagnostico"], 2025)
+        self.assertEqual(PERIODOS_ANALISIS["hansen_diagnostico"], 2025)
+        self.assertEqual(PERIODOS_ANALISIS["esri_inicial"], 2017)
+        self.assertEqual(PERIODOS_ANALISIS["esri_final"], 2024)
+        self.assertEqual(PERIODOS_ANALISIS["ndvi_final_visual"], 2025)
 
     def test_escala_ndvi_documenta_cinco_intervalos(self):
         self.assertEqual(len(CLASES_VIGOR_NDVI), 5)

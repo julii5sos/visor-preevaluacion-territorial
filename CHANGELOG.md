@@ -4,7 +4,21 @@ Este historial documenta la evolución de la aplicación UX. Las versiones sigue
 el formato `MAJOR.MINOR.PATCH`: una versión principal, mejoras compatibles y
 correcciones compatibles, respectivamente.
 
-## [0.2.4] - 2026-07-24 — versión actual
+## [0.2.5] - 2026-07-24 — versión actual
+
+### Claridad entre cálculo y visualización
+
+- El paso 2 se presenta como **Vista inicial de los mapas** y deja de prometer
+  que la opción seleccionada cambia el método analítico.
+- Todas las vistas ejecutan el mismo cálculo; únicamente determinan qué
+  comparador y qué capas aparecen primero.
+- Los selectores de años se identifican como controles exclusivamente visuales.
+- Los períodos del diagnóstico quedaron centralizados y fijos: referencia 2025,
+  JRC 2025, Hansen 2025 y ESRI 2017-2024 por ser la última serie disponible.
+- El registro metodológico separa los períodos fijos del diagnóstico de los años
+  elegidos para la visualización.
+
+## [0.2.4] - 2026-07-24
 
 ### Control de capas del mapa
 
