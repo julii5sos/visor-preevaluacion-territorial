@@ -2,7 +2,7 @@
 
 **Documento de referencia:** `Visor_PreEvaluacion_Territorial_NATURA_Documentacion.docx`
 
-**Implementación Streamlit:** UX-0.2.5
+**Implementación Streamlit:** UX-0.2.6
 
 **Método:** MT-2026.3
 

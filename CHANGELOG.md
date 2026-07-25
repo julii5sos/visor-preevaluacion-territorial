@@ -4,7 +4,20 @@ Este historial documenta la evolución de la aplicación UX. Las versiones sigue
 el formato `MAJOR.MINOR.PATCH`: una versión principal, mejoras compatibles y
 correcciones compatibles, respectivamente.
 
-## [0.2.5] - 2026-07-24 — versión actual
+## [0.2.6] - 2026-07-24 — versión actual
+
+### Identidad visual Natura Panamá
+
+- La interfaz adopta el verde institucional `#00544D` de Natura Panamá para
+  títulos, texto principal, controles y enlaces.
+- El texto secundario utiliza un verde complementario de alto contraste y el
+  verde `#76B72A` queda reservado para acentos y subrayados.
+- La configuración global de Streamlit aplica la misma identidad cromática a
+  los widgets nativos, la barra lateral y ambas entradas de la aplicación.
+- Los colores científicos de las capas, las prioridades y los avisos
+  semánticos se conservan para no alterar su interpretación.
+
+## [0.2.5] - 2026-07-24
 
 ### Claridad entre cálculo y visualización
 
