@@ -4,7 +4,29 @@ Este historial documenta la evolución de la aplicación UX. Las versiones sigue
 el formato `MAJOR.MINOR.PATCH`: una versión principal, mejoras compatibles y
 correcciones compatibles, respectivamente.
 
-## [0.2.1] - 2026-07-24 — versión actual
+## [0.2.2] - 2026-07-24 — versión actual
+
+### Correspondencia con el visor original
+
+- Se documentó la matriz funcional entre el visor de Google Earth Engine y la
+  aplicación Streamlit.
+- El análisis ahora conserva las seis clases JRC: bosque estable, degradación,
+  deforestación, recuperación, agua y otra cobertura.
+- Se muestran la cobertura arbórea persistente a 2020 y las pérdidas Hansen
+  anteriores y posteriores al corte.
+- Se añadió la lectura de consistencia alta, parcial, mixta o sin señal
+  consistente, sin modificar el índice ponderado.
+- El detalle incorpora un gráfico comparable del aporte de JRC, Hansen, ESRI,
+  GEDI y NDVI.
+- El PDF y el registro metodológico incluyen las nuevas estadísticas y la
+  consistencia entre fuentes.
+
+### Validación
+
+- Se ampliaron las pruebas unitarias para cubrir las cuatro lecturas de
+  consistencia y evitar que ganancias mínimas produzcan una lectura mixta.
+
+## [0.2.1] - 2026-07-24
 
 ### Metodología y trazabilidad
 

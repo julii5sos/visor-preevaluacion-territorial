@@ -1,7 +1,7 @@
 # Metodología del índice operativo de prioridad
 
-**Versión del método:** MT-2026.1  
-**Versión de implementación auditada:** UX-0.2.1
+**Versión del método:** MT-2026.2
+**Versión de implementación auditada:** UX-0.2.2
 
 ## Finalidad y alcance
 
@@ -23,6 +23,10 @@ determinación de cumplimiento EUDR.
 Cada producto se procesa en su propia proyección y resolución. Las superficies se
 calculan dentro del área seleccionada y se integran como evidencia por fuente; no se
 fuerzan coincidencias píxel a píxel entre productos.
+
+Para JRC TMF se calculan las seis clases anuales: bosque estable, degradación,
+deforestación, recuperación, agua y otra cobertura. Las seis se muestran en las
+estadísticas; solo degradación y deforestación pueden activar la señal de deterioro.
 
 ## Activación de señales
 
@@ -106,9 +110,27 @@ Una señal ESRI aislada produce 1.5 puntos. Una señal JRC aislada produce 2.0 y
 señal Hansen aislada produce 2.0. Por diseño, ESRI nunca aporta más que cualquiera
 de las dos fuentes forestales principales.
 
+## Consistencia entre fuentes
+
+La consistencia es una lectura adicional y no modifica el puntaje:
+
+| Lectura | Regla |
+|---|---|
+| Alta consistencia | JRC TMF, Hansen GFC y ESRI LULC presentan señal de deterioro |
+| Consistencia parcial | Exactamente dos de las tres fuentes presentan señal |
+| Lectura mixta | Coexisten señales de deterioro y de recuperación o ganancia |
+| Sin señal consistente | Menos de dos fuentes principales coinciden en deterioro |
+
+Para evitar que cambios mínimos produzcan una lectura mixta, la recuperación JRC
+se filtra con 0.5 ha o 1% del área y la ganancia de árboles ESRI con 0.10 ha y 5%
+del área. Son criterios simétricos a los umbrales de cambio usados para esas
+fuentes. Las ganancias no compensan ni restan puntos a una señal de deterioro,
+porque pueden ocurrir simultáneamente en sectores diferentes de la misma área.
+
 ## Trazabilidad
 
 Las constantes y funciones se mantienen en `metodologia_indice.py`. Las pruebas de
 `test_metodologia_indice.py` verifican pesos, umbrales, suma única por fuente,
-clasificación y exclusión de NDVI. El registro JSON conserva fuentes, períodos,
-umbrales, justificaciones, pesos, aportes efectivos y reglas de prioridad.
+clasificación, consistencia y exclusión de NDVI. El registro JSON conserva fuentes,
+períodos, umbrales, justificaciones, pesos, aportes efectivos, estadísticas y reglas
+de prioridad y consistencia.

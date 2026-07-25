@@ -33,9 +33,11 @@ from metodologia_indice import (
     JUSTIFICACION_UMBRALES,
     PESOS_INDICE,
     PUNTAJE_MAXIMO,
+    REGLAS_CONSISTENCIA,
     REGLAS_PRIORIDAD,
     UMBRALES_INDICE,
     calcular_indice_prioridad,
+    evaluar_consistencia,
     evaluar_senales,
 )
 
@@ -176,7 +178,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "1.2.9"
+APP_VERSION = "1.3.0"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
 ASSET_CUENCA = (
@@ -833,6 +835,8 @@ def ejecutar_analisis(
             tmf.eq(2).unmask(0).multiply(pixel_ha).rename("tmf_degradacion"),
             tmf.eq(3).unmask(0).multiply(pixel_ha).rename("tmf_deforestacion"),
             tmf.eq(4).unmask(0).multiply(pixel_ha).rename("tmf_recuperacion"),
+            tmf.eq(5).unmask(0).multiply(pixel_ha).rename("tmf_agua"),
+            tmf.eq(6).unmask(0).multiply(pixel_ha).rename("tmf_otra_cobertura"),
         ]
     )
     areas_hansen = ee.Image.cat(
@@ -903,7 +907,13 @@ def ejecutar_analisis(
 
     pct_tmf_defor = resultados["tmf_deforestacion"] / area_ha * 100 if area_ha else 0
     pct_tmf_degrad = resultados["tmf_degradacion"] / area_ha * 100 if area_ha else 0
+    pct_tmf_recuperacion = (
+        resultados["tmf_recuperacion"] / area_ha * 100 if area_ha else 0
+    )
     pct_esri_salida = resultados["esri_salida"] / area_ha * 100 if area_ha else 0
+    pct_esri_ganancia = (
+        resultados["esri_ganancia"] / area_ha * 100 if area_ha else 0
+    )
     pct_linea_base = resultados["linea_base"] / area_ha * 100 if area_ha else 0
 
     senales, gedi_disponible = evaluar_senales(
@@ -929,12 +939,23 @@ def ejecutar_analisis(
         senal_esri=senal_esri,
         senal_gedi=senal_gedi,
     )
+    consistencia = evaluar_consistencia(
+        senal_tmf=senal_tmf,
+        senal_hansen=senal_hansen,
+        senal_esri=senal_esri,
+        tmf_recuperacion_ha=resultados["tmf_recuperacion"],
+        tmf_recuperacion_pct=pct_tmf_recuperacion,
+        esri_ganancia_arboles_ha=resultados["esri_ganancia"],
+        esri_ganancia_arboles_pct=pct_esri_ganancia,
+    )
 
     resultados.update(
         {
             "pct_tmf_defor": pct_tmf_defor,
             "pct_tmf_degrad": pct_tmf_degrad,
+            "pct_tmf_recuperacion": pct_tmf_recuperacion,
             "pct_esri_salida": pct_esri_salida,
+            "pct_esri_ganancia": pct_esri_ganancia,
             "pct_linea_base": pct_linea_base,
             "senal_tmf": senal_tmf,
             "senal_hansen": senal_hansen,
@@ -944,6 +965,7 @@ def ejecutar_analisis(
             "aportes_indice": aportes_indice,
             "puntaje": puntaje,
             "prioridad": prioridad,
+            "consistencia": consistencia,
         }
     )
     return resultados
@@ -1247,13 +1269,7 @@ def generar_pdf(
         else "ninguna señal relevante de deterioro reciente"
     )
     coincidencia = (
-        "Dos o más fuentes independientes presentan señales en la misma dirección. "
-        "Esta coincidencia aumenta la necesidad de revisar los sectores señalados."
-        if fuentes >= 2
-        else "Las fuentes no muestran el mismo resultado. El cambio puede ser pequeño, "
-        "reciente, temporal o encontrarse en bordes de distintas coberturas."
-        if fuentes == 1
-        else "Las fuentes evaluadas no muestran señales relevantes de deterioro reciente."
+        f"{r['consistencia']['nivel']}: {r['consistencia']['detalle']}"
     )
     texto_dosel = (
         f"La altura promedio del dosel fue de {r['gedi_altura']:.1f} m. "
@@ -1343,6 +1359,15 @@ def generar_pdf(
                     estilos["CuerpoFicha"],
                 ),
             ],
+            [
+                Paragraph("Cobertura arbórea persistente a 2020", estilos["CuerpoFicha"]),
+                Paragraph(
+                    f"<b>{r['linea_base']:.1f} ha ({r['pct_linea_base']:.1f}%)</b>",
+                    estilos["CuerpoFicha"],
+                ),
+                Paragraph("Pérdida Hansen 2001-2020", estilos["CuerpoFicha"]),
+                Paragraph(f"<b>{r['hansen_pre']:.2f} ha</b>", estilos["CuerpoFicha"]),
+            ],
         ],
         colWidths=[4.6 * cm, 3.0 * cm, 4.6 * cm, 3.0 * cm],
     )
@@ -1382,7 +1407,8 @@ def generar_pdf(
             f"<b>3. Condición del bosque y la vegetación.</b> JRC TMF {anio_tmf_diagnostico} registró "
             f"{r['tmf_estable']:.1f} ha de bosque estable, {r['tmf_degradacion']:.1f} ha "
             f"de degradación, {r['tmf_deforestacion']:.1f} ha de deforestación y "
-            f"{r['tmf_recuperacion']:.1f} ha de recuperación. {texto_dosel}",
+            f"{r['tmf_recuperacion']:.1f} ha de recuperación, {r['tmf_agua']:.1f} ha "
+            f"de agua y {r['tmf_otra_cobertura']:.1f} ha de otra cobertura. {texto_dosel}",
         ),
         (
             "¿QUÉ SIGNIFICAN ESTOS RESULTADOS?",
@@ -1390,6 +1416,10 @@ def generar_pdf(
             "pero no establecen automáticamente su causa. El patrón observado puede "
             "corresponder a manejo productivo, cosecha de plantaciones, regeneración, "
             "nubosidad residual o una modificación real de la cobertura forestal.",
+        ),
+        (
+            "CONSISTENCIA ENTRE FUENTES",
+            coincidencia,
         ),
         (
             "¿DÓNDE SE DEBE REVISAR?",
@@ -1477,7 +1507,7 @@ def generar_pdf(
     historia.extend([PageBreak(), Paragraph("DIAGNÓSTICO POR FUENTE", estilos["TituloFicha"])])
     filas_fuentes = [
         ["Fuente", "Resultado específico", "Señal", "Aporte"],
-        [f"JRC TMF {anio_tmf_diagnostico}", f"Deforestación {r['tmf_deforestacion']:.1f} ha; degradación {r['tmf_degradacion']:.1f} ha", "Sí" if r["senal_tmf"] else "No", f"{aportes['tmf']:.1f}/{PESOS_INDICE['tmf']:.1f}"],
+        [f"JRC TMF {anio_tmf_diagnostico}", f"Estable {r['tmf_estable']:.1f}; degradación {r['tmf_degradacion']:.1f}; deforestación {r['tmf_deforestacion']:.1f}; recuperación {r['tmf_recuperacion']:.1f}; agua {r['tmf_agua']:.1f}; otra cobertura {r['tmf_otra_cobertura']:.1f} ha", "Sí" if r["senal_tmf"] else "No", f"{aportes['tmf']:.1f}/{PESOS_INDICE['tmf']:.1f}"],
         ["Hansen GFC", f"Pérdida posterior al {CUTOFF_LABEL}: {r['hansen_post']:.2f} ha", "Sí" if r["senal_hansen"] else "No", f"{aportes['hansen']:.1f}/{PESOS_INDICE['hansen']:.1f}"],
         [f"ESRI {anio_esri_inicial}-{anio_esri_final}", f"Salida de árboles {r['esri_salida']:.1f} ha ({r['pct_esri_salida']:.1f}%)", "Sí" if r["senal_esri"] else "No", f"{aportes['esri']:.1f}/{PESOS_INDICE['esri']:.1f}"],
         ["GEDI", f"Dosel {r['gedi_altura']:.1f} m; área con datos válidos {r['gedi_cobertura_pct']:.0f}%" if r["gedi_disponible"] else "Datos insuficientes", "Contexto" if r["senal_gedi"] else "No", f"{aportes['gedi']:.1f}/{PESOS_INDICE['gedi']:.1f}"],
@@ -1538,6 +1568,13 @@ def generar_pdf(
             ),
             Paragraph(
                 f"<b>Justificación de los umbrales.</b> {texto_justificacion_umbrales}",
+                estilos["CuerpoFicha"],
+            ),
+            Paragraph(
+                "<b>Consistencia entre fuentes.</b> Alta: JRC, Hansen y ESRI presentan "
+                "señal; parcial: dos fuentes presentan señal; mixta: coexisten deterioro "
+                "y recuperación o ganancia; sin señal consistente: menos de dos fuentes "
+                "coinciden. Esta lectura no modifica el puntaje.",
                 estilos["CuerpoFicha"],
             ),
         ]
@@ -1631,6 +1668,17 @@ def mostrar_resultados(
         "Cada fuente puede sumar una sola vez. JRC y Hansen aportan como máximo "
         "2.0 cada uno; ESRI 1.5, GEDI 0.5 y NDVI 0.0."
     )
+    consistencia = resultados["consistencia"]
+    fuentes_deterioro = ", ".join(consistencia["fuentes_deterioro"]) or "ninguna"
+    fuentes_recuperacion = (
+        ", ".join(consistencia["fuentes_recuperacion"]) or "ninguna"
+    )
+    st.info(
+        f"**Consistencia entre fuentes: {consistencia['nivel']}.** "
+        f"{consistencia['detalle']} "
+        f"Señales de deterioro: {fuentes_deterioro}. "
+        f"Recuperación o ganancia: {fuentes_recuperacion}."
+    )
     resumen, detalle = st.tabs(["Lectura sencilla", "Detalle técnico por fuente"])
     with resumen:
         st.markdown(
@@ -1695,6 +1743,17 @@ def mostrar_resultados(
         ),
     ]
     with detalle:
+        st.markdown("**Estadísticas territoriales y forestales**")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Área evaluada", f"{resultados['area_ha']:.1f} ha")
+        c2.metric(
+            "Cobertura arbórea persistente a 2020",
+            f"{resultados['linea_base']:.1f} ha",
+            f"{resultados['pct_linea_base']:.1f}% del área",
+            delta_color="off",
+        )
+        c3.metric("Pérdida Hansen 2001-2020", f"{resultados['hansen_pre']:.2f} ha")
+        c4.metric("Pérdida Hansen post-2020", f"{resultados['hansen_post']:.2f} ha")
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Bosque estable JRC", f"{resultados['tmf_estable']:.1f} ha")
         c2.metric("Degradación JRC", f"{resultados['tmf_degradacion']:.1f} ha")
@@ -1714,12 +1773,21 @@ def mostrar_resultados(
             st.markdown("**Distribución del estado forestal JRC**")
             st.bar_chart(
                 {
-                    "Clase": ["Bosque estable", "Degradación", "Deforestación", "Recuperación"],
+                    "Clase": [
+                        "Bosque estable",
+                        "Degradación",
+                        "Deforestación",
+                        "Recuperación",
+                        "Agua",
+                        "Otra cobertura",
+                    ],
                     "Hectáreas": [
                         resultados["tmf_estable"],
                         resultados["tmf_degradacion"],
                         resultados["tmf_deforestacion"],
                         resultados["tmf_recuperacion"],
+                        resultados["tmf_agua"],
+                        resultados["tmf_otra_cobertura"],
                     ],
                 },
                 x="Clase",
@@ -1741,6 +1809,26 @@ def mostrar_resultados(
                 y="Hectáreas",
                 height=280,
             )
+        st.markdown("**Comparación del aporte de las fuentes al índice**")
+        st.bar_chart(
+            {
+                "Fuente": ["JRC TMF", "Hansen GFC", "ESRI LULC", "GEDI", "NDVI"],
+                "Aporte": [
+                    aportes["tmf"],
+                    aportes["hansen"],
+                    aportes["esri"],
+                    aportes["gedi"],
+                    aportes["ndvi"],
+                ],
+            },
+            x="Fuente",
+            y="Aporte",
+            height=280,
+        )
+        st.caption(
+            "El gráfico representa aportes ponderados, no superficies comparables "
+            "píxel a píxel. NDVI permanece en 0 porque es exclusivamente visual."
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -2412,6 +2500,20 @@ try:
                     f"- **NDVI · 0.0:** {JUSTIFICACION_PESOS['ndvi']}",
                 ]
             )
+        )
+        st.markdown("**Lectura de consistencia entre fuentes**")
+        st.markdown(
+            "\n".join(
+                [
+                    f"- **Alta consistencia:** {REGLAS_CONSISTENCIA['alta']}.",
+                    f"- **Consistencia parcial:** {REGLAS_CONSISTENCIA['parcial']}.",
+                    f"- **Lectura mixta:** {REGLAS_CONSISTENCIA['mixta']}.",
+                    f"- **Sin señal consistente:** {REGLAS_CONSISTENCIA['sin_senal']}.",
+                ]
+            )
+        )
+        st.caption(
+            "La consistencia complementa la interpretación y no modifica el índice."
         )
         st.markdown("**Justificación de los umbrales**")
         st.markdown(
