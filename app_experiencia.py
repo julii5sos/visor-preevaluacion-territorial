@@ -12,7 +12,7 @@ import ee
 import folium
 import requests
 import streamlit as st
-from folium.plugins import Draw, Fullscreen, SideBySideLayers
+from folium.plugins import Draw, Fullscreen, GroupedLayerControl, SideBySideLayers
 from google.oauth2 import service_account
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
@@ -470,7 +470,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "UX-0.2.3"
+APP_VERSION = "UX-0.2.4"
 METHODOLOGY_VERSION = "MT-2026.3"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
@@ -2819,11 +2819,14 @@ try:
                     index=len(list(range(anio_esri_inicial + 1, ANO_ESRI_MAX + 1))) - 1,
                 )
             capas_activas = st.multiselect(
-                "Mapas adicionales:",
+                "Capas disponibles en el mapa:",
                 opciones_capas,
                 default=capas_activas,
                 format_func=lambda valor: nombres_capas[valor],
-                help="Seleccione solo los mapas que realmente necesita para mantener el visor ágil.",
+                help=(
+                    "Elija qué capas estarán disponibles. Dentro del mapa podrá mostrar "
+                    "una sola capa temática a la vez."
+                ),
             )
             anio_ndvi_inicial = st.selectbox(
                 "Año inicial del cambio vegetal:",
@@ -3173,9 +3176,23 @@ try:
             layer_right=capa_derecha,
         ).add_to(mapa)
 
-    # Las capas auxiliares se mantienen disponibles en Layers, pero comienzan
-    # apagadas cuando existe un barrido para no cubrir los años comparados.
-    mostrar_capas_auxiliares = modo_comparador == "Sin comparador"
+    # El control exclusivo evita que varias capas temáticas se oculten entre sí.
+    # Sin comparador se muestra inicialmente la primera capa disponible; durante
+    # un barrido comienzan todas apagadas para no cubrir los años comparados.
+    mostrar_primera_tematica = modo_comparador == "Sin comparador"
+    capas_tematicas_mapa = []
+
+    def agregar_tematica(imagen, visualizacion, nombre):
+        capa = capa_gee(
+            mapa,
+            imagen,
+            visualizacion,
+            nombre,
+            mostrar=mostrar_primera_tematica and not capas_tematicas_mapa,
+        )
+        capas_tematicas_mapa.append(capa)
+        return capa
+
     perdida_post = perdida_pre = linea_base = None
     if any(
         nombre in capas_activas
@@ -3188,52 +3205,40 @@ try:
         perdida_post, perdida_pre, linea_base = imagenes_hansen(geometria)
 
     if "Pérdida Hansen post-2020" in capas_activas:
-        capa_gee(
-            mapa,
+        agregar_tematica(
             perdida_post,
             VIS_HANSEN_POST,
             f"Hansen 2021-{ANO_HANSEN_MAX}",
-            mostrar=mostrar_capas_auxiliares,
         )
     if "Pérdida Hansen 2001-2020" in capas_activas:
-        capa_gee(
-            mapa,
+        agregar_tematica(
             perdida_pre,
             VIS_HANSEN_PRE,
             "Hansen 2001-2020",
-            mostrar=mostrar_capas_auxiliares,
         )
     if "Cobertura arbórea persistente" in capas_activas:
-        capa_gee(
-            mapa,
+        agregar_tematica(
             linea_base,
             VIS_LINEA_BASE,
             "Cobertura arbórea persistente",
-            mostrar=mostrar_capas_auxiliares,
         )
     if "Deforestación JRC" in capas_activas:
-        capa_gee(
-            mapa,
+        agregar_tematica(
             obtener_tmf(ANO_DIAG_TMF, geometria).eq(3).selfMask(),
             VIS_TMF_DEFOR,
             f"Deforestación JRC {ANO_DIAG_TMF}",
-            mostrar=mostrar_capas_auxiliares,
         )
     if "Degradación JRC" in capas_activas:
-        capa_gee(
-            mapa,
+        agregar_tematica(
             obtener_tmf(ANO_DIAG_TMF, geometria).eq(2).selfMask(),
             VIS_TMF_DEGRAD,
             f"Degradación JRC {ANO_DIAG_TMF}",
-            mostrar=mostrar_capas_auxiliares,
         )
     if "Uso y cobertura ESRI" in capas_activas:
-        capa_gee(
-            mapa,
+        agregar_tematica(
             obtener_esri_visual(anio_esri_final, geometria),
             VIS_ESRI,
             f"Uso y cobertura ESRI {anio_esri_final}",
-            mostrar=mostrar_capas_auxiliares,
         )
     if "Transiciones ESRI" in capas_activas:
         esri_i = obtener_esri(anio_esri_inicial, geometria)
@@ -3245,21 +3250,17 @@ try:
             .where(esri_i.eq(2).And(esri_f.eq(2)), 3)
             .selfMask()
         )
-        capa_gee(
-            mapa,
+        agregar_tematica(
             transicion,
             VIS_ESRI_CAMBIO,
             f"Transiciones ESRI {anio_esri_inicial}-{anio_esri_final}",
-            mostrar=mostrar_capas_auxiliares,
         )
     if "Altura GEDI" in capas_activas:
         gedi = imagen_gedi(geometria)
-        capa_gee(
-            mapa,
+        agregar_tematica(
             gedi,
             VIS_GEDI,
             "Altura del dosel GEDI",
-            mostrar=mostrar_capas_auxiliares,
         )
     ndvi_final = None
     if "ΔNDVI" in capas_activas or "Vegetación NDVI" in capas_activas:
@@ -3267,30 +3268,26 @@ try:
     if "ΔNDVI" in capas_activas:
         ndvi_inicial = obtener_ndvi(anio_ndvi_inicial, geometria)
         delta_ndvi = ndvi_final.subtract(ndvi_inicial).rename("delta_ndvi")
-        capa_gee(
-            mapa,
+        agregar_tematica(
             delta_ndvi,
             VIS_NDVI_DELTA,
             f"ΔNDVI {anio_ndvi_inicial}-{ANO_NDVI_MAX}",
-            mostrar=mostrar_capas_auxiliares,
         )
     if "Vegetación NDVI" in capas_activas:
-        capa_gee(
-            mapa,
+        agregar_tematica(
             clasificar_ndvi(ndvi_final),
             VIS_NDVI_CLASES,
             f"Vegetación NDVI {ANO_NDVI_MAX}",
-            mostrar=mostrar_capas_auxiliares,
         )
 
     cuenca = ee.FeatureCollection(ASSET_CUENCA)
-    capa_gee(
+    capa_limite_cuenca = capa_gee(
         mapa,
         cuenca.style(color="FF4444", fillColor="00000000", width=3),
         {},
         "Límite de la cuenca",
     )
-    capa_gee(
+    capa_area_seleccionada = capa_gee(
         mapa,
         area_seleccionada.style(color="00E5FF", fillColor="00E5FF18", width=4),
         {},
@@ -3305,7 +3302,34 @@ try:
             etiqueta_final,
         )
     mapa.fit_bounds(limites_area)
-    folium.LayerControl(collapsed=True).add_to(mapa)
+    if capas_tematicas_mapa:
+        sin_capa_tematica = folium.FeatureGroup(
+            name="Sin capa temática",
+            overlay=True,
+            control=True,
+            show=not mostrar_primera_tematica,
+        )
+        sin_capa_tematica.add_to(mapa)
+        GroupedLayerControl(
+            groups={
+                "Capa temática · seleccione una": [
+                    sin_capa_tematica,
+                    *capas_tematicas_mapa,
+                ]
+            },
+            exclusive_groups=True,
+            collapsed=True,
+        ).add_to(mapa)
+    GroupedLayerControl(
+        groups={
+            "Referencias · se mantienen visibles": [
+                capa_limite_cuenca,
+                capa_area_seleccionada,
+            ]
+        },
+        exclusive_groups=False,
+        collapsed=True,
+    ).add_to(mapa)
 
     st.markdown("#### Mapa interactivo del área evaluada")
     if etiqueta_inicial and etiqueta_final:
@@ -3320,12 +3344,13 @@ try:
         )
         st.caption(
             "Arrastre el control circular del divisor vertical. El lado izquierdo muestra el "
-            "año inicial y el derecho el año final. Las capas temáticas adicionales comienzan "
-            "apagadas para no cubrir el barrido; puede activarlas después desde Layers."
+            "año inicial y el derecho el año final. Las capas temáticas comienzan apagadas "
+            "para no cubrir el barrido. Al seleccionar una, la anterior se apaga automáticamente."
         )
     else:
         st.caption(
-            "Use el botón Layers dentro del mapa para mostrar u ocultar las capas disponibles."
+            "Use «Capa temática» dentro del mapa para cambiar de información sin superponerla. "
+            "Los límites del área se controlan por separado en «Referencias»."
         )
     st_folium(
         mapa,
