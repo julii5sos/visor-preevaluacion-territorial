@@ -31,6 +31,7 @@ from reportlab.platypus import (
 from streamlit_folium import st_folium
 
 from metodologia_indice import (
+    CLASES_VIGOR_NDVI,
     JUSTIFICACION_PESOS,
     JUSTIFICACION_UMBRALES,
     PESOS_INDICE,
@@ -389,6 +390,34 @@ st.markdown(
         font-size: .84rem;
         line-height: 1.45;
     }
+    .ndvi-metodo-fila {
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+        min-height: 52px;
+        padding: .55rem .7rem;
+        border: 1px solid var(--institucional-borde);
+        border-radius: .35rem;
+        background: #ffffff;
+    }
+    .ndvi-metodo-color {
+        width: 1.35rem;
+        height: 1.35rem;
+        border: 1px solid rgba(0,0,0,.42);
+        border-radius: .15rem;
+        flex: 0 0 1.35rem;
+    }
+    .ndvi-metodo-texto {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: .25rem .6rem;
+        min-width: 0;
+    }
+    .ndvi-metodo-rango {
+        color: var(--institucional-suave);
+        font-variant-numeric: tabular-nums;
+    }
     @media (prefers-reduced-motion: reduce) {
         .leyenda-info {transition: none;}
     }
@@ -441,8 +470,8 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "UX-0.2.2"
-METHODOLOGY_VERSION = "MT-2026.2"
+APP_VERSION = "UX-0.2.3"
+METHODOLOGY_VERSION = "MT-2026.3"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
 ASSET_CUENCA = (
@@ -624,15 +653,12 @@ LEYENDAS = {
         ("#1B5E20", "Aumento fuerte"),
     ],
     "Vegetación NDVI": [
-        ("#B30000", "Sin vegetación activa", "NDVI menor que 0."),
         (
-            "#F4A582",
-            "Suelo/cobertura muy escasa",
-            "NDVI de 0.0 a menos de 0.2.",
-        ),
-        ("#FFFFBF", "Vegetación escasa", "NDVI de 0.2 a menos de 0.4."),
-        ("#78C679", "Vegetación moderada", "NDVI de 0.4 a menos de 0.6."),
-        ("#006837", "Vegetación densa", "NDVI mayor o igual que 0.6."),
+            clase["color"],
+            f"{clase['etiqueta']} · {clase['rango']}",
+            clase["interpretacion"],
+        )
+        for clase in CLASES_VIGOR_NDVI
     ],
 }
 
@@ -714,6 +740,7 @@ def construir_registro_metodologico(
         "justificacion_pesos": dict(JUSTIFICACION_PESOS),
         "reglas_prioridad": dict(REGLAS_PRIORIDAD),
         "reglas_consistencia": dict(REGLAS_CONSISTENCIA),
+        "clases_vigor_ndvi": [dict(clase) for clase in CLASES_VIGOR_NDVI],
         "procesamiento": {
             "unidad_area": "hectareas",
             "reduccion": "suma de area por clase en la proyeccion de cada fuente",
@@ -1717,6 +1744,10 @@ def generar_pdf(
             "ndvi",
         )
     )
+    texto_clases_ndvi = "; ".join(
+        f"{clase['etiqueta']} ({clase['rango']})"
+        for clase in CLASES_VIGOR_NDVI
+    )
     area = r["area_ha"]
     pct_arbol = r["esri_arboles_final"] / area * 100 if area else 0
     pct_ganancia = r["esri_ganancia"] / area * 100 if area else 0
@@ -2047,6 +2078,12 @@ def generar_pdf(
                 estilos["CuerpoFicha"],
             ),
             Paragraph(
+                f"<b>Escala visual de vigor NDVI.</b> {texto_clases_ndvi}. "
+                "Los intervalos describen vigor espectral y no identifican por sí solos "
+                "el tipo de cobertura ni la presencia de bosque natural.",
+                estilos["CuerpoFicha"],
+            ),
+            Paragraph(
                 "<b>Consistencia entre fuentes.</b> Alta: JRC, Hansen y ESRI presentan "
                 "señal; parcial: dos fuentes presentan señal; mixta: coexisten deterioro "
                 "y recuperación o ganancia; sin señal consistente: menos de dos fuentes "
@@ -2208,6 +2245,49 @@ def mostrar_leyenda(titulo, elementos):
             f'{contenido}</div>'
         )
     st.markdown("".join(filas), unsafe_allow_html=True)
+
+
+def mostrar_escala_ndvi_metodologia():
+    st.markdown("**Escala visual del vigor vegetal (NDVI)**")
+    st.caption(
+        "Los intervalos se muestran siempre. Pulse el botón de información de "
+        "cada clase para conocer su interpretación y sus precauciones."
+    )
+    for clase in CLASES_VIGOR_NDVI:
+        contenido, ayuda = st.columns(
+            [5, 1.35],
+            gap="small",
+            vertical_alignment="center",
+        )
+        with contenido:
+            etiqueta = html_lib.escape(clase["etiqueta"])
+            rango = html_lib.escape(clase["rango"])
+            st.markdown(
+                f"""
+                <div class="ndvi-metodo-fila">
+                  <span class="ndvi-metodo-color" style="background:{clase['color']};"></span>
+                  <span class="ndvi-metodo-texto">
+                    <strong>{etiqueta}</strong>
+                    <span class="ndvi-metodo-rango">{rango}</span>
+                  </span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        with ayuda:
+            with st.popover(
+                "Información",
+                icon=":material/info:",
+                help=f"Cómo interpretar: {clase['etiqueta']}",
+                use_container_width=True,
+            ):
+                st.markdown(f"**{clase['etiqueta']}**")
+                st.code(clase["rango"], language=None)
+                st.write(clase["interpretacion"])
+    st.caption(
+        "Esta escala describe vigor espectral, no tipo de cobertura. Un NDVI alto "
+        "no confirma por sí solo la presencia de bosque natural."
+    )
 
 
 def mostrar_resultados(
@@ -3311,6 +3391,7 @@ try:
                 como apoyo visual. No modifica el índice de prioridad.
                 """
             )
+            mostrar_escala_ndvi_metodologia()
             st.markdown("**Justificación de los pesos**")
             st.markdown(
                 "\n".join(

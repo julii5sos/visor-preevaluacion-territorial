@@ -1,7 +1,8 @@
 # Metodología del índice operativo de prioridad
 
-**Versión del método:** MT-2026.2
-**Versión de implementación auditada:** UX-0.2.2
+**Versión del método:** MT-2026.3
+
+**Versión de implementación auditada:** UX-0.2.3
 
 ## Finalidad y alcance
 
@@ -76,6 +77,21 @@ con disponibilidad espacial insuficiente.
 Se calcula como `(B8 - B4) / (B8 + B4)` sobre compuestos anuales con máscara SCL.
 Se utiliza solo como evidencia visual porque puede responder a estacionalidad,
 humedad, cultivos, pastizales, nubes y sombras. Su aporte al índice es 0.0.
+
+La clasificación visual utilizada en el mapa y el informe es:
+
+| Intervalo NDVI | Lectura visual | Interpretación orientativa |
+|---:|---|---|
+| < 0 | Sin vegetación activa | Agua, sombra, nubes residuales o superficies no vegetadas |
+| 0.0 a < 0.2 | Suelo o cobertura muy escasa | Suelo desnudo, área construida o vegetación muy dispersa |
+| 0.2 a < 0.4 | Vegetación escasa | Cobertura poco densa, pastizal o cultivo en etapa temprana |
+| 0.4 a < 0.6 | Vegetación moderada | Actividad vegetal y cobertura intermedias |
+| ≥ 0.6 | Vegetación densa | Señal alta de vegetación verde y densa |
+
+Los intervalos describen vigor espectral, no tipo de cobertura. Un valor alto no
+confirma por sí solo bosque natural, y uno bajo no demuestra por sí solo pérdida
+forestal. En la aplicación, cada clase incluye un botón de información accesible
+mediante pulsación o teclado.
 
 ## Índice ponderado
 

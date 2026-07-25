@@ -1,6 +1,7 @@
 import unittest
 
 from metodologia_indice import (
+    CLASES_VIGOR_NDVI,
     PESOS_INDICE,
     PUNTAJE_MAXIMO,
     calcular_indice_prioridad,
@@ -25,6 +26,23 @@ class IndicePrioridadTest(unittest.TestCase):
         self.assertEqual(PESOS_INDICE["gedi"], 0.5)
         self.assertEqual(PESOS_INDICE["ndvi"], 0.0)
         self.assertEqual(PUNTAJE_MAXIMO, 6.0)
+
+    def test_escala_ndvi_documenta_cinco_intervalos(self):
+        self.assertEqual(len(CLASES_VIGOR_NDVI), 5)
+        self.assertEqual(
+            [clase["rango"] for clase in CLASES_VIGOR_NDVI],
+            [
+                "NDVI < 0",
+                "0.0 ≤ NDVI < 0.2",
+                "0.2 ≤ NDVI < 0.4",
+                "0.4 ≤ NDVI < 0.6",
+                "NDVI ≥ 0.6",
+            ],
+        )
+        for clase in CLASES_VIGOR_NDVI:
+            self.assertTrue(clase["etiqueta"])
+            self.assertTrue(clase["interpretacion"])
+            self.assertRegex(clase["color"], r"^#[0-9A-Fa-f]{6}$")
 
     def test_esri_no_supera_fuentes_forestales(self):
         aportes_esri, puntaje_esri, prioridad_esri = self.calcular(esri=True)
