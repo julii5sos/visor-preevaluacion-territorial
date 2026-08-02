@@ -7,7 +7,7 @@ cumplimiento EUDR.
 
 ## Versión actual
 
-La versión principal de la nueva experiencia es **v0.2.6**. El historial completo
+La versión principal de la nueva experiencia es **v0.2.7**. El historial completo
 de mejoras y correcciones está disponible en [CHANGELOG.md](CHANGELOG.md), y el
 método reproducible se documenta en [METODOLOGIA.md](METODOLOGIA.md). La
 correspondencia con el visor original de Google Earth Engine está registrada en
@@ -23,17 +23,18 @@ correspondencia con el visor original de Google Earth Engine está registrada en
    - exploración visual personalizada.
 3. Pulsar **Ejecutar análisis**.
 4. Revisar la lectura sencilla, el detalle técnico y los mapas.
-5. Descargar el informe PDF con seis mapas temáticos.
+5. Descargar el informe PDF con siete mapas temáticos.
 
-La vista elegida no cambia el cálculo: únicamente organiza el comparador y las
-capas que aparecen primero. La referencia metodológica es 2025; se utilizan JRC
+La vista elegida no cambia el cálculo: únicamente organiza la visualización. La
+referencia metodológica es 2025; se utilizan JRC
 2025, Hansen 2025 y ESRI 2017-2024, última serie disponible. Los años del modo
 técnico modifican solamente la visualización de los mapas.
 
-En el mapa interactivo las capas temáticas se seleccionan de una en una: al
-activar otra, la anterior se apaga automáticamente. La opción **Sin capa
-temática** permite volver a la imagen satelital, y los límites permanecen
-disponibles en un control de referencias separado.
+La exploración personalizada separa dos modos. **Comparar años** muestra
+únicamente el barrido temporal JRC, ESRI o NDVI. **Explorar capas** permite
+encender varias capas sin eliminarlas, ordenar cuál queda arriba y elegir cuál
+aparece visible al abrir el mapa. Los límites permanecen por encima de la
+información temática en un control de referencias separado.
 
 ### Área dibujada
 
@@ -57,8 +58,14 @@ NDVI describe vigor espectral, no un tipo de cobertura.
 
 El cálculo de superficies se realiza por fuente en su resolución de trabajo: ESRI a
 10 m, JRC y Hansen aproximadamente a 30 m, y el producto de altura a su escala de
-análisis. Las fuentes se integran por área; no se interpretan como coincidencias
-píxel a píxel.
+análisis. Las fuentes se integran por área para calcular el índice. Además, el
+séptimo mapa **Sectores que requieren revisión** estandariza únicamente JRC, Hansen
+y ESRI en una malla común de 30 m para orientar dónde revisar.
+
+La clase amarilla indica una señal aislada; la naranja, coincidencia de dos fuentes;
+y la roja oscura, coincidencia de tres. GEDI y NDVI no participan en este mapa. La
+superposición no modifica el índice, no demuestra la causa del cambio y no determina
+cumplimiento EUDR.
 
 ## Índice operativo de prioridad
 
@@ -92,7 +99,8 @@ La ficha utiliza tipografía Times e incluye:
 - consistencia entre fuentes y estadísticas Hansen anteriores y posteriores a 2020;
 - interpretación en lenguaje sencillo;
 - acción recomendada y conclusión;
-- mapas ESRI, JRC, Hansen, GEDI, cambio de NDVI y vigor vegetal;
+- mapas ESRI, JRC, Hansen, GEDI, cambio de NDVI, vigor vegetal y sectores que
+  requieren revisión;
 - diagnóstico por fuente, notas metodológicas y paginación.
 
 ## Configuración de Streamlit Cloud
@@ -129,8 +137,9 @@ fincas ni el código de acceso en el repositorio.
 
 ## Rendimiento
 
-- Las capas se solicitan a Earth Engine solo cuando están activas.
-- El análisis entrega primero los resultados; el informe con seis mapas se prepara
+- Las capas se solicitan a Earth Engine solo cuando están disponibles en la vista
+  configurada; el usuario controla cuáles permanecen visibles dentro del mapa.
+- El análisis entrega primero los resultados; el informe con siete mapas se prepara
   únicamente cuando el usuario lo solicita.
 - Las reducciones de JRC, Hansen, ESRI y GEDI se agrupan en una sola respuesta de
   Earth Engine para reducir viajes de red.
@@ -147,6 +156,7 @@ territorial de `app.py`, pero con un recorrido pensado para usuarios no especial
 - controles técnicos mediante divulgación progresiva;
 - resumen en lenguaje sencillo y evidencia por fuente;
 - mapas interactivos, informe PDF y registro metodológico JSON;
+- séptimo mapa de coincidencia espacial con estadísticas de una, dos o tres fuentes;
 - código de reproducibilidad para identificar cada configuración.
 
 El detalle técnico conserva las seis clases JRC, las transiciones ESRI, la cobertura

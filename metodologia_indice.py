@@ -24,6 +24,48 @@ PESOS_INDICE = {
 
 PUNTAJE_MAXIMO = sum(PESOS_INDICE.values())
 
+REGLAS_MAPA_COINCIDENCIA = {
+    "nombre": "Sectores que requieren revisión",
+    "malla_referencia_m": 30,
+    "fuentes": {
+        "jrc": "degradación o deforestación JRC TMF 2025",
+        "hansen": "pérdida Hansen posterior al 31/12/2020",
+        "esri": "transición de árboles a no árboles ESRI 2017-2024",
+    },
+    "clases": {
+        1: {
+            "color": "#F9A825",
+            "etiqueta": "Señal de 1 fuente",
+            "interpretacion": (
+                "Evidencia espacial aislada. Revise el producto correspondiente "
+                "antes de atribuir una causa."
+            ),
+        },
+        2: {
+            "color": "#E65100",
+            "etiqueta": "Coincidencia de 2 fuentes",
+            "interpretacion": (
+                "Dos fuentes señalan el mismo sector en la malla común. Priorice "
+                "su contraste con imágenes recientes y documentos."
+            ),
+        },
+        3: {
+            "color": "#8E1B16",
+            "etiqueta": "Coincidencia de 3 fuentes",
+            "interpretacion": (
+                "JRC, Hansen y ESRI señalan el mismo sector. Es la clase de mayor "
+                "prioridad cartográfica, sin que ello demuestre causalidad."
+            ),
+        },
+    },
+    "participa_indice": False,
+    "limitacion": (
+        "La superposición espacial es un apoyo cartográfico indicativo. Orienta "
+        "dónde revisar, pero no demuestra la causa del cambio, no sustituye la "
+        "verificación documental o de campo y no determina cumplimiento EUDR."
+    ),
+}
+
 UMBRALES_INDICE = {
     "hansen_post_2020_ha": 0.18,
     "jrc_deforestacion_ha": 0.5,

@@ -4,7 +4,37 @@ Este historial documenta la evolución de la aplicación UX. Las versiones sigue
 el formato `MAJOR.MINOR.PATCH`: una versión principal, mejoras compatibles y
 correcciones compatibles, respectivamente.
 
-## [0.2.6] - 2026-07-24 — versión actual
+## [0.2.8] - 2026-08-01 — versión actual
+
+### Comparador y explorador de capas independientes
+
+- La visualización personalizada separa **Comparar años** de **Explorar capas**,
+  evitando que el barrido temporal cubra GEDI, Hansen, JRC, ESRI o NDVI.
+- El comparador admite JRC TMF, ESRI LULC y clases de vigor NDVI; sus años son
+  exclusivamente visuales y no alteran el diagnóstico.
+- El explorador permite encender varias capas, conservarlas disponibles y
+  ordenarlas de arriba hacia abajo mediante controles explícitos.
+- Las capas utilizan niveles de dibujo estables y los límites de referencia
+  permanecen por encima de la información temática.
+- Se reforzó el estilo del botón primario para mantener texto blanco en las
+  versiones actuales de Streamlit.
+- La portada incorpora una explicación en lenguaje sencillo para personas sin
+  conocimientos de sistemas de información geográfica.
+
+## [0.2.7] - 2026-07-24
+
+### Séptimo mapa de orientación espacial
+
+- Se incorporó **Sectores que requieren revisión**, un mapa que suma las señales
+  espaciales de JRC TMF 2025, Hansen posterior a 2020 y ESRI 2017-2024.
+- Las tres fuentes se estandarizan en la malla JRC de 30 m y se muestran como
+  señal de una fuente, coincidencia de dos fuentes o coincidencia de tres fuentes.
+- La lectura rápida, el PDF y el registro metodológico informan las hectáreas de
+  cada clase y priorizan las coincidencias de dos o tres fuentes.
+- GEDI y NDVI no participan en la superposición. El séptimo mapa no modifica el
+  índice ponderado ni constituye evidencia causal o una determinación EUDR.
+
+## [0.2.6] - 2026-07-24
 
 ### Identidad visual Natura Panamá
 
