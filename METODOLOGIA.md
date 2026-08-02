@@ -1,8 +1,8 @@
 # Metodología del índice operativo de prioridad
 
-**Versión del método:** MT-2026.3
+**Versión del método:** MT-2026.4
 
-**Versión de implementación auditada:** UX-0.2.6
+**Versión de implementación auditada:** UX-0.2.8
 
 ## Finalidad y alcance
 
@@ -22,8 +22,9 @@ determinación de cumplimiento EUDR.
 | Sentinel-2 SR Harmonized | 10 m | NDVI y cambio de vigor vegetal, solo visual |
 
 Cada producto se procesa en su propia proyección y resolución. Las superficies se
-calculan dentro del área seleccionada y se integran como evidencia por fuente; no se
-fuerzan coincidencias píxel a píxel entre productos.
+calculan dentro del área seleccionada y se integran como evidencia por fuente para
+el índice. Solo el mapa de coincidencia espacial descrito más adelante estandariza
+JRC, Hansen y ESRI en una malla común.
 
 ## Períodos fijos y controles visuales
 
@@ -38,8 +39,9 @@ sean comparables, el cálculo usa períodos fijos:
 - NDVI: evidencia visual hasta 2025 y aporte 0.0 al índice.
 
 Los años que el usuario selecciona en el modo técnico modifican únicamente el
-comparador, los mapas interactivos y las imágenes cartográficas. No cambian los
-períodos fijos usados para calcular señales, puntaje o prioridad.
+comparador JRC, ESRI o NDVI, los mapas interactivos y las imágenes cartográficas.
+El comparador temporal y el explorador de capas se presentan como modos separados.
+Ninguno cambia los períodos fijos usados para calcular señales, puntaje o prioridad.
 
 Para JRC TMF se calculan las seis clases anuales: bosque estable, degradación,
 deforestación, recuperación, agua y otra cobertura. Las seis se muestran en las
@@ -159,10 +161,36 @@ del área. Son criterios simétricos a los umbrales de cambio usados para esas
 fuentes. Las ganancias no compensan ni restan puntos a una señal de deterioro,
 porque pueden ocurrir simultáneamente en sectores diferentes de la misma área.
 
+## Mapa de coincidencia espacial
+
+El séptimo mapa, **Sectores que requieren revisión**, responde a una pregunta
+distinta del índice: ubica dónde se superponen las señales de deterioro de las tres
+fuentes principales. Utiliza:
+
+- JRC TMF 2025: degradación o deforestación;
+- Hansen GFC: pérdida posterior al 31/12/2020;
+- ESRI LULC 2017-2024: transición de árboles a no árboles.
+
+JRC conserva su malla de 30 m. Hansen se reproyecta por vecino más cercano y la
+señal ESRI de 10 m se agrega por presencia máxima antes de llevarse a la misma malla.
+Las tres imágenes binarias se suman y producen:
+
+| Valor | Clase | Lectura |
+|---:|---|---|
+| 1 | Señal de una fuente | Evidencia aislada; revisar el producto correspondiente |
+| 2 | Coincidencia de dos fuentes | Sector de revisión prioritaria |
+| 3 | Coincidencia de tres fuentes | Sector con coincidencia espacial de JRC, Hansen y ESRI |
+
+GEDI y NDVI no participan en esta superposición porque son fuentes de contexto y
+apoyo visual, respectivamente. El mapa no agrega puntos, no modifica la prioridad,
+no demuestra causalidad y no sustituye la revisión documental, imágenes recientes
+o verificación de campo.
+
 ## Trazabilidad
 
 Las constantes y funciones se mantienen en `metodologia_indice.py`. Las pruebas de
 `test_metodologia_indice.py` verifican pesos, umbrales, suma única por fuente,
 clasificación, consistencia y exclusión de NDVI. El registro JSON conserva fuentes,
 períodos, umbrales, justificaciones, pesos, aportes efectivos, estadísticas y reglas
-de prioridad y consistencia.
+de prioridad y consistencia, además de la regla y las superficies del mapa de
+coincidencia espacial.

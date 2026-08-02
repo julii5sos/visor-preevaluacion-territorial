@@ -36,6 +36,7 @@ from metodologia_indice import (
     PESOS_INDICE,
     PUNTAJE_MAXIMO,
     REGLAS_CONSISTENCIA,
+    REGLAS_MAPA_COINCIDENCIA,
     REGLAS_PRIORIDAD,
     UMBRALES_INDICE,
     calcular_indice_prioridad,
@@ -217,7 +218,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "1.3.4"
+APP_VERSION = "1.3.5"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
 ASSET_CUENCA = (
@@ -318,6 +319,14 @@ VIS_NDVI_CLASES = {
     "max": 4,
     "palette": ["B30000", "F4A582", "FFFFBF", "78C679", "006837"],
 }
+VIS_COINCIDENCIA_REVISION = {
+    "min": 1,
+    "max": 3,
+    "palette": [
+        REGLAS_MAPA_COINCIDENCIA["clases"][clase]["color"].lstrip("#")
+        for clase in (1, 2, 3)
+    ],
+}
 VIS_RGB = {"min": 150, "max": 3200, "gamma": 1.15, "bands": ["B4", "B3", "B2"]}
 
 PERFILES_VISUALIZACION = {
@@ -325,6 +334,7 @@ PERFILES_VISUALIZACION = {
         "descripcion": "Abre primero el comparador JRC y las capas forestales principales.",
         "comparador": "JRC TMF",
         "capas": [
+            "Sectores para revisión",
             "Pérdida Hansen post-2020",
             "Deforestación JRC",
             "Degradación JRC",
@@ -348,6 +358,14 @@ PERFILES_VISUALIZACION = {
 }
 
 LEYENDAS = {
+    "Sectores para revisión": [
+        (
+            REGLAS_MAPA_COINCIDENCIA["clases"][clase]["color"],
+            REGLAS_MAPA_COINCIDENCIA["clases"][clase]["etiqueta"],
+            REGLAS_MAPA_COINCIDENCIA["clases"][clase]["interpretacion"],
+        )
+        for clase in (1, 2, 3)
+    ],
     "JRC TMF": [
         ("#006400", "Bosque no perturbado"),
         ("#FFCC00", "Degradación"),
@@ -757,6 +775,63 @@ def imagenes_hansen(geometria):
     return perdida_post, perdida_pre, linea_base
 
 
+def imagen_coincidencia_revision(
+    geometria,
+    tmf=None,
+    perdida_post=None,
+    esri_inicial=None,
+    esri_final=None,
+):
+    """Estandariza tres señales de deterioro en la malla JRC de 30 m."""
+    if tmf is None:
+        tmf = obtener_tmf(ANO_DIAG_TMF, geometria)
+    if perdida_post is None:
+        perdida_post, _, _ = imagenes_hansen(geometria)
+    if esri_inicial is None:
+        esri_inicial = obtener_esri(ANO_ESRI_MIN, geometria)
+    if esri_final is None:
+        esri_final = obtener_esri(ANO_ESRI_MAX, geometria)
+
+    proyeccion_referencia = ee.Image(tmf).projection()
+    senal_jrc = (
+        ee.Image(tmf)
+        .eq(2)
+        .Or(ee.Image(tmf).eq(3))
+        .unmask(0)
+        .rename("senal_jrc")
+    )
+    senal_hansen = (
+        ee.Image(perdida_post)
+        .gt(0)
+        .unmask(0)
+        .reproject(crs=proyeccion_referencia)
+        .rename("senal_hansen")
+    )
+    senal_esri_10m = (
+        ee.Image(esri_inicial)
+        .eq(2)
+        .And(ee.Image(esri_final).neq(2))
+        .unmask(0)
+    )
+    senal_esri = (
+        senal_esri_10m.reduceResolution(
+            reducer=ee.Reducer.max(),
+            bestEffort=True,
+            maxPixels=1024,
+        )
+        .reproject(crs=proyeccion_referencia)
+        .gt(0)
+        .rename("senal_esri")
+    )
+    return (
+        senal_jrc.add(senal_hansen)
+        .add(senal_esri)
+        .rename("fuentes_coincidentes")
+        .toByte()
+        .clip(geometria)
+    )
+
+
 def imagen_gedi(geometria):
     return (
         ee.ImageCollection(GEDI_ASSET)
@@ -861,6 +936,13 @@ def ejecutar_analisis(
     esri_inicial = obtener_esri(anio_esri_inicial, geometria)
     esri_final = obtener_esri(anio_esri_final, geometria)
     perdida_post, perdida_pre, linea_base = imagenes_hansen(geometria)
+    coincidencia_revision = imagen_coincidencia_revision(
+        geometria,
+        tmf=tmf,
+        perdida_post=perdida_post,
+        esri_inicial=esri_inicial,
+        esri_final=esri_final,
+    )
     gedi = imagen_gedi(geometria)
     pixel_ha = ee.Image.pixelArea().divide(10000)
 
@@ -874,6 +956,15 @@ def ejecutar_analisis(
             tmf.eq(4).unmask(0).multiply(pixel_ha).rename("tmf_recuperacion"),
             tmf.eq(5).unmask(0).multiply(pixel_ha).rename("tmf_agua"),
             tmf.eq(6).unmask(0).multiply(pixel_ha).rename("tmf_otra_cobertura"),
+            coincidencia_revision.eq(1).unmask(0).multiply(pixel_ha).rename(
+                "coincidencia_1_fuente"
+            ),
+            coincidencia_revision.eq(2).unmask(0).multiply(pixel_ha).rename(
+                "coincidencia_2_fuentes"
+            ),
+            coincidencia_revision.eq(3).unmask(0).multiply(pixel_ha).rename(
+                "coincidencia_3_fuentes"
+            ),
         ]
     )
     areas_hansen = ee.Image.cat(
@@ -940,6 +1031,15 @@ def ejecutar_analisis(
     resultados["gedi_area_datos"] = numero(resumen_gedi, "area_datos")
     resultados["gedi_cobertura_pct"] = (
         resultados["gedi_area_datos"] / area_ha * 100 if area_ha else 0
+    )
+    resultados["coincidencia_varias_fuentes"] = (
+        resultados["coincidencia_2_fuentes"]
+        + resultados["coincidencia_3_fuentes"]
+    )
+    resultados["pct_coincidencia_varias_fuentes"] = (
+        resultados["coincidencia_varias_fuentes"] / area_ha * 100
+        if area_ha
+        else 0
     )
 
     pct_tmf_defor = resultados["tmf_deforestacion"] / area_ha * 100 if area_ha else 0
@@ -1088,6 +1188,14 @@ def generar_mapas_reporte(
 
     hansen = ee.Image(HANSEN_ASSET).select("lossyear")
     rgb = obtener_rgb_sentinel(ANO_NDVI_MAX, geometria)
+    perdida_post, _, _ = imagenes_hansen(geometria)
+    coincidencia_revision = imagen_coincidencia_revision(
+        geometria,
+        tmf=tmf,
+        perdida_post=perdida_post,
+        esri_inicial=obtener_esri(ANO_ESRI_MIN, geometria),
+        esri_final=obtener_esri(ANO_ESRI_MAX, geometria),
+    )
 
     especificaciones = [
         (
@@ -1132,6 +1240,21 @@ def generar_mapas_reporte(
                 area_fc,
             ),
             "Rojo: NDVI inferior a 0, sin vegetación activa | Rosado: NDVI 0.0 a menos de 0.2, suelo o cobertura muy escasa | Amarillo: NDVI 0.2 a menos de 0.4, vegetación escasa | Verde claro: NDVI 0.4 a menos de 0.6, vegetación moderada | Verde oscuro: NDVI mayor o igual a 0.6, vegetación densa",
+        ),
+        (
+            "Sectores que requieren revisión - Coincidencia espacial",
+            visualizar_con_borde(
+                coincidencia_revision.updateMask(coincidencia_revision.gt(0)),
+                VIS_COINCIDENCIA_REVISION,
+                area_fc,
+                fondo=rgb,
+            ),
+            (
+                "Amarillo: señal de 1 fuente | Naranja: coincidencia de 2 fuentes | "
+                "Rojo oscuro: coincidencia de 3 fuentes. Integra JRC TMF 2025, "
+                "Hansen posterior a 2020 y ESRI 2017-2024 en una malla común de "
+                "30 m. GEDI y NDVI no participan; el mapa no modifica el índice."
+            ),
         ),
     ]
 
@@ -1312,6 +1435,14 @@ def generar_pdf(
     coincidencia = (
         f"{r['consistencia']['nivel']}: {r['consistencia']['detalle']}"
     )
+    texto_coincidencia_espacial = (
+        f"El mapa 7 ubica {r['coincidencia_1_fuente']:.2f} ha con señal de una "
+        f"fuente, {r['coincidencia_2_fuentes']:.2f} ha con coincidencia de dos "
+        f"fuentes y {r['coincidencia_3_fuentes']:.2f} ha con coincidencia de tres. "
+        f"Priorice las {r['coincidencia_varias_fuentes']:.2f} ha señaladas por dos "
+        "o tres fuentes. Esta superposición no modifica el índice y no demuestra "
+        "por sí sola la causa del cambio."
+    )
     texto_dosel = (
         f"La altura promedio del dosel fue de {r['gedi_altura']:.1f} m. "
         f"El {r['gedi_cobertura_pct']:.0f}% del área presentó datos válidos en el producto de altura."
@@ -1409,6 +1540,19 @@ def generar_pdf(
                 Paragraph("Pérdida Hansen 2001-2020", estilos["CuerpoFicha"]),
                 Paragraph(f"<b>{r['hansen_pre']:.2f} ha</b>", estilos["CuerpoFicha"]),
             ],
+            [
+                Paragraph("Señal espacial de una fuente", estilos["CuerpoFicha"]),
+                Paragraph(
+                    f"<b>{r['coincidencia_1_fuente']:.2f} ha</b>",
+                    estilos["CuerpoFicha"],
+                ),
+                Paragraph("Coincidencia de dos o tres fuentes", estilos["CuerpoFicha"]),
+                Paragraph(
+                    f"<b>{r['coincidencia_varias_fuentes']:.2f} ha "
+                    f"({r['pct_coincidencia_varias_fuentes']:.2f}%)</b>",
+                    estilos["CuerpoFicha"],
+                ),
+            ],
         ],
         colWidths=[4.6 * cm, 3.0 * cm, 4.6 * cm, 3.0 * cm],
     )
@@ -1464,9 +1608,9 @@ def generar_pdf(
         ),
         (
             "¿DÓNDE SE DEBE REVISAR?",
-            "Los sectores resaltados en los mapas temáticos son una referencia visual para "
-            "orientar la revisión. Deben contrastarse con imágenes recientes, registros de "
-            "manejo, información del predio y verificación de campo cuando corresponda.",
+            f"{texto_coincidencia_espacial} Deben contrastarse con imágenes recientes, "
+            "registros de manejo, información del predio y verificación de campo "
+            "cuando corresponda.",
         ),
         ("ACCIÓN RECOMENDADA", texto_recomendacion(r["prioridad"])),
         (
@@ -1540,7 +1684,9 @@ def generar_pdf(
         Paragraph(
             "Nota cartográfica: el contorno celeste identifica el área evaluada. Las imágenes "
             "se generan automáticamente a partir de las fuentes indicadas y deben interpretarse "
-            "junto con las leyendas y las limitaciones metodológicas.",
+            "junto con las leyendas y las limitaciones metodológicas. El mapa 7 estandariza "
+            "JRC, Hansen y ESRI en una malla común de 30 m solo para orientar la ubicación; "
+            "GEDI y NDVI no participan en esa superposición.",
             estilos["CuerpoFicha"],
         )
     )
@@ -1592,7 +1738,8 @@ def generar_pdf(
                 "La preevaluación integró JRC Tropical Moist Forest, Hansen Global Forest "
                 "Change, ESRI Land Use/Land Cover, altura del dosel basada en GEDI y NDVI "
                 "derivado de Sentinel-2. Los cálculos se realizan por fuente en su resolución "
-                "de trabajo; no se interpretan como coincidencias píxel a píxel.",
+                "de trabajo. Únicamente el mapa 7 realiza una superposición espacial "
+                "estandarizada en 30 m para orientar la revisión; no modifica el índice.",
                 estilos["CuerpoFicha"],
             ),
             Paragraph(
@@ -2108,6 +2255,7 @@ try:
     )
 
     opciones_capas = [
+        "Sectores para revisión",
         "Pérdida Hansen post-2020",
         "Pérdida Hansen 2001-2020",
         "Cobertura arbórea persistente",
@@ -2120,6 +2268,7 @@ try:
         "Vegetación NDVI",
     ]
     nombres_capas = {
+        "Sectores para revisión": "Sectores que requieren revisión (3 fuentes)",
         "Pérdida Hansen post-2020": "Pérdida de árboles posterior a 2020",
         "Pérdida Hansen 2001-2020": "Pérdida histórica de árboles (2001-2020)",
         "Cobertura arbórea persistente": "Cobertura arbórea persistente hasta 2020",
@@ -2240,7 +2389,7 @@ try:
     st.subheader("3. Ejecute la preevaluación")
     st.caption(
         "El visor calculará las señales y preparará automáticamente la ficha PDF con "
-        f"seis mapas temáticos. La referencia metodológica es {ANO_REFERENCIA_ANALISIS}: "
+        f"siete mapas temáticos. La referencia metodológica es {ANO_REFERENCIA_ANALISIS}: "
         f"JRC y Hansen {ANO_REFERENCIA_ANALISIS}, con ESRI {ANO_ESRI_MIN}-{ANO_ESRI_MAX}. "
         "Todos los años elegibles cambian únicamente los mapas. El proceso puede tardar un momento."
     )
@@ -2303,10 +2452,10 @@ try:
         )
         errores_mapas = st.session_state.get("errores_mapas", [])
         if errores_mapas:
-            disponibles = 6 - len(errores_mapas)
+            disponibles = 7 - len(errores_mapas)
             if disponibles:
                 st.warning(
-                    f"El informe contiene {disponibles} de 6 mapas. Algunas imágenes "
+                    f"El informe contiene {disponibles} de 7 mapas. Algunas imágenes "
                     "no estuvieron disponibles temporalmente; puede ejecutar nuevamente el análisis."
                 )
             else:
@@ -2423,12 +2572,27 @@ try:
     if any(
         nombre in capas_activas
         for nombre in [
+            "Sectores para revisión",
             "Pérdida Hansen post-2020",
             "Pérdida Hansen 2001-2020",
             "Cobertura arbórea persistente",
         ]
     ):
         perdida_post, perdida_pre, linea_base = imagenes_hansen(geometria)
+
+    if "Sectores para revisión" in capas_activas:
+        coincidencia_revision = imagen_coincidencia_revision(
+            geometria,
+            tmf=obtener_tmf(ANO_DIAG_TMF, geometria),
+            perdida_post=perdida_post,
+            esri_inicial=obtener_esri(ANO_ESRI_MIN, geometria),
+            esri_final=obtener_esri(ANO_ESRI_MAX, geometria),
+        )
+        agregar_tematica(
+            coincidencia_revision.updateMask(coincidencia_revision.gt(0)),
+            VIS_COINCIDENCIA_REVISION,
+            "Sectores que requieren revisión · JRC + Hansen + ESRI",
+        )
 
     if "Pérdida Hansen post-2020" in capas_activas:
         agregar_tematica(
@@ -2615,8 +2779,9 @@ try:
             - **Sentinel-2 NDVI:** vigor vegetal y su cambio entre dos períodos; solo visual.
 
             Las fuentes tienen resoluciones, fechas y metodologías diferentes. El visor integra
-            señales por área para priorizar revisiones; no compara píxeles exactos entre productos
-            y no constituye una certificación ni una determinación legal.
+            señales por área para priorizar revisiones. La capa «Sectores que requieren revisión»
+            es la única que estandariza JRC, Hansen y ESRI en una malla común de 30 m para
+            orientar la ubicación. No constituye una certificación ni una determinación legal.
             """
         )
         st.markdown(
@@ -2649,6 +2814,17 @@ try:
         )
         st.caption(
             "La consistencia complementa la interpretación y no modifica el índice."
+        )
+        st.markdown("**Mapa de coincidencia espacial**")
+        st.markdown(
+            "\n".join(
+                [
+                    "- **1 fuente · amarillo:** señal aislada.",
+                    "- **2 fuentes · naranja:** coincidencia espacial prioritaria.",
+                    "- **3 fuentes · rojo oscuro:** coincidencia de JRC, Hansen y ESRI.",
+                    f"- **Limitación:** {REGLAS_MAPA_COINCIDENCIA['limitacion']}",
+                ]
+            )
         )
         st.markdown("**Justificación de los umbrales**")
         st.markdown(

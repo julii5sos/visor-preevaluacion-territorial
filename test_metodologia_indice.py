@@ -5,6 +5,7 @@ from metodologia_indice import (
     PERIODOS_ANALISIS,
     PESOS_INDICE,
     PUNTAJE_MAXIMO,
+    REGLAS_MAPA_COINCIDENCIA,
     calcular_indice_prioridad,
     evaluar_consistencia,
     evaluar_senales,
@@ -35,6 +36,23 @@ class IndicePrioridadTest(unittest.TestCase):
         self.assertEqual(PERIODOS_ANALISIS["esri_inicial"], 2017)
         self.assertEqual(PERIODOS_ANALISIS["esri_final"], 2024)
         self.assertEqual(PERIODOS_ANALISIS["ndvi_final_visual"], 2025)
+
+    def test_mapa_coincidencia_es_indicativo_y_no_cambia_indice(self):
+        self.assertEqual(REGLAS_MAPA_COINCIDENCIA["malla_referencia_m"], 30)
+        self.assertEqual(
+            set(REGLAS_MAPA_COINCIDENCIA["fuentes"]),
+            {"jrc", "hansen", "esri"},
+        )
+        self.assertEqual(
+            set(REGLAS_MAPA_COINCIDENCIA["clases"]),
+            {1, 2, 3},
+        )
+        self.assertFalse(REGLAS_MAPA_COINCIDENCIA["participa_indice"])
+        for clase in REGLAS_MAPA_COINCIDENCIA["clases"].values():
+            self.assertRegex(clase["color"], r"^#[0-9A-Fa-f]{6}$")
+            self.assertTrue(clase["etiqueta"])
+            self.assertTrue(clase["interpretacion"])
+        self.assertEqual(PUNTAJE_MAXIMO, 6.0)
 
     def test_escala_ndvi_documenta_cinco_intervalos(self):
         self.assertEqual(len(CLASES_VIGOR_NDVI), 5)

@@ -2,9 +2,9 @@
 
 **Documento de referencia:** `Visor_PreEvaluacion_Territorial_NATURA_Documentacion.docx`
 
-**Implementación Streamlit:** UX-0.2.6
+**Implementación Streamlit:** UX-0.2.8
 
-**Método:** MT-2026.3
+**Método:** MT-2026.4
 
 Esta matriz verifica que la migración a Python, Streamlit y GitHub conserve las
 funciones descritas para el visor original. La interfaz se reorganiza para facilitar
@@ -17,8 +17,9 @@ su uso, pero las fuentes, las comparaciones y el diagnóstico permanecen disponi
 | Polígono dibujado por el usuario | Herramienta de dibujo y análisis del GeoJSON recortado a la cuenca |
 | Comparador visual JRC | Barrido sincronizado entre año inicial y final, con rótulos visibles |
 | Comparador visual ESRI | Barrido sincronizado entre año inicial y final |
+| Comparador visual NDVI | Barrido entre el año inicial seleccionado y 2025 con clases de vigor; no altera el índice |
 | Selección de años | Controles visuales JRC, ESRI y NDVI; no alteran el diagnóstico fijo de referencia 2025 (ESRI 2017-2024) |
-| Capas temáticas | JRC, Hansen histórico y posterior a 2020, línea base, ESRI, GEDI y NDVI; selección exclusiva para impedir superposiciones accidentales |
+| Capas temáticas | JRC, Hansen histórico y posterior a 2020, línea base, ESRI, GEDI, NDVI y sectores que requieren revisión; pueden combinarse y ordenarse cuando se utiliza el explorador sin comparador |
 | Leyenda activa | Leyendas dependientes del comparador y de las capas seleccionadas |
 | JRC TMF | Seis clases, estadísticas, mapa, gráfico y señal ponderada |
 | Hansen GFC | Cobertura persistente a 2020, pérdida 2001-2020 y pérdida posterior a 2020 |
@@ -27,8 +28,9 @@ su uso, pero las fuentes, las comparaciones y el diagnóstico permanecen disponi
 | Sentinel-2 NDVI | NDVI anual, cambio visual y respaldo del año anterior; aporte 0 al índice |
 | Índice integrado | JRC 2.0, Hansen 2.0, ESRI 1.5, GEDI 0.5 y NDVI 0.0 |
 | Consistencia entre fuentes | Alta, parcial, mixta o sin señal consistente; no modifica el puntaje |
+| Coincidencia espacial | Séptimo mapa en malla común de 30 m con señal de una, dos o tres fuentes; no modifica el índice |
 | Gráficos | Distribución de las seis clases JRC, transiciones ESRI y aporte ponderado por fuente |
-| Ficha exportable | PDF directo con texto, tablas, seis mapas, leyendas, metodología y limitaciones |
+| Ficha exportable | PDF directo con texto, tablas, siete mapas, leyendas, metodología y limitaciones |
 | Registro reproducible | JSON sin geometría de las fincas privadas; incluye fuentes, períodos, umbrales, resultados y aportes |
 | Actualización anual | Años y activos centralizados en el bloque de configuración |
 

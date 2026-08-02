@@ -38,6 +38,7 @@ from metodologia_indice import (
     PESOS_INDICE,
     PUNTAJE_MAXIMO,
     REGLAS_CONSISTENCIA,
+    REGLAS_MAPA_COINCIDENCIA,
     REGLAS_PRIORIDAD,
     UMBRALES_INDICE,
     calcular_indice_prioridad,
@@ -101,19 +102,33 @@ st.markdown(
         color: var(--institucional-verde-oscuro);
     }
     .stButton > button[kind="primary"],
-    .stDownloadButton > button[kind="primary"] {
-        border-color: var(--institucional-verde);
-        background: var(--institucional-verde);
-        color: #ffffff;
+    .stDownloadButton > button[kind="primary"],
+    .stButton button[data-testid="stBaseButton-primary"],
+    .stDownloadButton button[data-testid="stBaseButton-primary"],
+    button[data-testid="stBaseButton-primary"] {
+        border-color: var(--institucional-verde) !important;
+        background: var(--institucional-verde) !important;
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+        font-weight: 700;
     }
     .stButton > button[kind="primary"] *,
-    .stDownloadButton > button[kind="primary"] * {
+    .stDownloadButton > button[kind="primary"] *,
+    .stButton button[data-testid="stBaseButton-primary"] *,
+    .stDownloadButton button[data-testid="stBaseButton-primary"] *,
+    button[data-testid="stBaseButton-primary"] * {
         color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
     }
     .stButton > button[kind="primary"]:hover,
-    .stDownloadButton > button[kind="primary"]:hover {
-        border-color: var(--institucional-verde-oscuro);
-        background: var(--institucional-verde-oscuro);
+    .stDownloadButton > button[kind="primary"]:hover,
+    .stButton button[data-testid="stBaseButton-primary"]:hover,
+    .stDownloadButton button[data-testid="stBaseButton-primary"]:hover,
+    button[data-testid="stBaseButton-primary"]:hover {
+        border-color: var(--institucional-verde-oscuro) !important;
+        background: var(--institucional-verde-oscuro) !important;
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
     }
     [data-testid="stSidebar"] {border-right: 1px solid var(--institucional-borde);}
     [data-testid="stSidebar"] > div:first-child {background: #ffffff;}
@@ -153,6 +168,76 @@ st.markdown(
     }
     .cabecera-app p {margin: .65rem 0 0; color: var(--institucional-suave); max-width: 980px;}
     .alcance-app {margin-top: .65rem; font-size: .86rem; color: var(--institucional-suave);}
+    .resumen-inicial {
+        margin: .9rem 0 1rem;
+        padding: 1rem 1.1rem 1.05rem;
+        border: 1px solid var(--institucional-borde);
+        border-radius: .35rem;
+        background: #ffffff;
+    }
+    .resumen-inicial h2 {
+        margin: 0 0 .35rem;
+        color: var(--institucional-verde);
+        font-size: 1.35rem;
+        line-height: 1.3;
+    }
+    .resumen-inicial > p {
+        max-width: 75ch;
+        margin: 0;
+        color: var(--institucional-suave);
+        font-size: 1rem;
+        line-height: 1.6;
+    }
+    .resumen-principiante {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: .65rem;
+        margin: .85rem 0;
+    }
+    .resumen-paso {
+        position: relative;
+        min-height: 136px;
+        padding: .85rem .9rem .85rem 3.25rem;
+        border: 1px solid var(--institucional-borde);
+        border-radius: .35rem;
+        background: var(--institucional-fondo);
+    }
+    .resumen-paso-numero {
+        position: absolute;
+        top: .85rem;
+        left: .85rem;
+        display: inline-grid;
+        place-items: center;
+        width: 1.8rem;
+        height: 1.8rem;
+        border-radius: 50%;
+        background: var(--institucional-verde);
+        color: #ffffff;
+        font-weight: 750;
+    }
+    .resumen-paso h3 {
+        margin: 0 0 .3rem;
+        color: var(--institucional-verde);
+        font-size: 1rem;
+        line-height: 1.35;
+    }
+    .resumen-paso p {
+        margin: 0;
+        color: var(--institucional-suave);
+        font-size: .92rem;
+        line-height: 1.5;
+    }
+    .resumen-aclaracion {
+        margin-top: .25rem;
+        padding: .75rem .85rem;
+        border-left: 4px solid var(--institucional-verde);
+        border-radius: 0 .25rem .25rem 0;
+        background: var(--institucional-verde-claro);
+        color: var(--institucional-tinta);
+        font-size: .93rem;
+        line-height: 1.55;
+    }
+    .resumen-aclaracion strong {color: var(--institucional-verde);}
     .flujo-pasos {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -489,16 +574,18 @@ st.markdown(
     }
     .comparador-anios span:last-child {text-align: right;}
     @media (max-width: 760px) {
-        .flujo-pasos, .contexto-analisis, .entregables,
+        .flujo-pasos, .contexto-analisis, .entregables, .resumen-principiante,
         .lectura-rapida, .recuperacion-error {grid-template-columns: 1fr 1fr;}
         .block-container {padding-top: 3.5rem;}
         .cabecera-app {padding: 1.2rem;}
         .cabecera-app h1 {font-size: 2rem; line-height: 1.15;}
     }
     @media (max-width: 480px) {
-        .flujo-pasos, .contexto-analisis, .entregables,
+        .flujo-pasos, .contexto-analisis, .entregables, .resumen-principiante,
         .lectura-rapida, .recuperacion-error {grid-template-columns: 1fr;}
         .flujo-paso {min-height: 82px;}
+        .resumen-inicial {padding: .9rem;}
+        .resumen-inicial > p {font-size: 1rem;}
     }
     @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after {
@@ -518,8 +605,8 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "UX-0.2.6"
-METHODOLOGY_VERSION = "MT-2026.3"
+APP_VERSION = "UX-0.2.8"
+METHODOLOGY_VERSION = "MT-2026.4"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
 ASSET_CUENCA = (
@@ -620,13 +707,22 @@ VIS_NDVI_CLASES = {
     "max": 4,
     "palette": ["B30000", "F4A582", "FFFFBF", "78C679", "006837"],
 }
+VIS_COINCIDENCIA_REVISION = {
+    "min": 1,
+    "max": 3,
+    "palette": [
+        REGLAS_MAPA_COINCIDENCIA["clases"][clase]["color"].lstrip("#")
+        for clase in (1, 2, 3)
+    ],
+}
 VIS_RGB = {"min": 150, "max": 3200, "gamma": 1.15, "bands": ["B4", "B3", "B2"]}
 
 PERFILES_VISUALIZACION = {
     "Panorama forestal (vista recomendada)": {
-        "descripcion": "Abre primero el comparador JRC y las capas forestales principales.",
-        "comparador": "JRC TMF",
+        "descripcion": "Muestra las capas forestales principales sin que un comparador las cubra.",
+        "comparador": "Sin comparador",
         "capas": [
+            "Sectores para revisión",
             "Pérdida Hansen post-2020",
             "Deforestación JRC",
             "Degradación JRC",
@@ -635,7 +731,7 @@ PERFILES_VISUALIZACION = {
     "Vista de uso del suelo": {
         "descripcion": "Abre primero la comparación visual de coberturas ESRI.",
         "comparador": "ESRI LULC",
-        "capas": ["Uso y cobertura ESRI", "Transiciones ESRI"],
+        "capas": [],
     },
     "Vista de vegetación": {
         "descripcion": "Abre primero los mapas de NDVI y altura del dosel.",
@@ -643,13 +739,21 @@ PERFILES_VISUALIZACION = {
         "capas": ["Altura GEDI", "ΔNDVI", "Vegetación NDVI"],
     },
     "Exploración visual personalizada": {
-        "descripcion": "Permite elegir comparador, capas y años del mapa sin cambiar el cálculo.",
-        "comparador": "JRC TMF",
-        "capas": ["Pérdida Hansen post-2020"],
+        "descripcion": "Permite comparar años o explorar capas en modos separados, sin cambiar el cálculo.",
+        "comparador": "Sin comparador",
+        "capas": ["Altura GEDI", "Vegetación NDVI"],
     },
 }
 
 LEYENDAS = {
+    "Sectores para revisión": [
+        (
+            REGLAS_MAPA_COINCIDENCIA["clases"][clase]["color"],
+            REGLAS_MAPA_COINCIDENCIA["clases"][clase]["etiqueta"],
+            REGLAS_MAPA_COINCIDENCIA["clases"][clase]["interpretacion"],
+        )
+        for clase in (1, 2, 3)
+    ],
     "JRC TMF": [
         ("#006400", "Bosque no perturbado"),
         ("#FFCC00", "Degradación"),
@@ -702,6 +806,14 @@ LEYENDAS = {
         ("#1B5E20", "Aumento fuerte"),
     ],
     "Vegetación NDVI": [
+        (
+            clase["color"],
+            f"{clase['etiqueta']} · {clase['rango']}",
+            clase["interpretacion"],
+        )
+        for clase in CLASES_VIGOR_NDVI
+    ],
+    "NDVI Sentinel-2": [
         (
             clase["color"],
             f"{clase['etiqueta']} · {clase['rango']}",
@@ -805,6 +917,21 @@ def construir_registro_metodologico(
         "justificacion_pesos": dict(JUSTIFICACION_PESOS),
         "reglas_prioridad": dict(REGLAS_PRIORIDAD),
         "reglas_consistencia": dict(REGLAS_CONSISTENCIA),
+        "mapa_coincidencia_espacial": {
+            "nombre": REGLAS_MAPA_COINCIDENCIA["nombre"],
+            "malla_referencia_m": REGLAS_MAPA_COINCIDENCIA[
+                "malla_referencia_m"
+            ],
+            "fuentes": dict(REGLAS_MAPA_COINCIDENCIA["fuentes"]),
+            "clases": {
+                str(clase): dict(especificacion)
+                for clase, especificacion in REGLAS_MAPA_COINCIDENCIA[
+                    "clases"
+                ].items()
+            },
+            "participa_indice": REGLAS_MAPA_COINCIDENCIA["participa_indice"],
+            "limitacion": REGLAS_MAPA_COINCIDENCIA["limitacion"],
+        },
         "clases_vigor_ndvi": [dict(clase) for clase in CLASES_VIGOR_NDVI],
         "procesamiento": {
             "unidad_area": "hectareas",
@@ -812,6 +939,11 @@ def construir_registro_metodologico(
             "respuesta_earth_engine": "reducciones agrupadas en una sola respuesta",
             "ndvi": "mediana anual con mascara SCL y respaldo del ano anterior",
             "formula_ndvi": "(B8 - B4) / (B8 + B4)",
+            "coincidencia_espacial": (
+                "JRC conserva su malla de 30 m; Hansen se reproyecta por vecino "
+                "más cercano y ESRI se agrega desde 10 m por presencia máxima "
+                "antes de sumar las tres señales binarias."
+            ),
         },
     }
     huella = hashlib.sha256(
@@ -859,6 +991,14 @@ def construir_registro_metodologico(
                 "esri_ganancia_arboles_ha": resultados["esri_ganancia"],
                 "gedi_altura_media_m": resultados["gedi_altura"],
                 "gedi_cobertura_valida_pct": resultados["gedi_cobertura_pct"],
+                "coincidencia_espacial_ha": {
+                    "una_fuente": resultados["coincidencia_1_fuente"],
+                    "dos_fuentes": resultados["coincidencia_2_fuentes"],
+                    "tres_fuentes": resultados["coincidencia_3_fuentes"],
+                    "dos_o_tres_fuentes": resultados[
+                        "coincidencia_varias_fuentes"
+                    ],
+                },
             },
         }
     return registro
@@ -1212,6 +1352,63 @@ def imagenes_hansen(geometria):
     return perdida_post, perdida_pre, linea_base
 
 
+def imagen_coincidencia_revision(
+    geometria,
+    tmf=None,
+    perdida_post=None,
+    esri_inicial=None,
+    esri_final=None,
+):
+    """Estandariza tres señales de deterioro en la malla JRC de 30 m."""
+    if tmf is None:
+        tmf = obtener_tmf(ANO_DIAG_TMF, geometria)
+    if perdida_post is None:
+        perdida_post, _, _ = imagenes_hansen(geometria)
+    if esri_inicial is None:
+        esri_inicial = obtener_esri(ANO_ESRI_MIN, geometria)
+    if esri_final is None:
+        esri_final = obtener_esri(ANO_ESRI_MAX, geometria)
+
+    proyeccion_referencia = ee.Image(tmf).projection()
+    senal_jrc = (
+        ee.Image(tmf)
+        .eq(2)
+        .Or(ee.Image(tmf).eq(3))
+        .unmask(0)
+        .rename("senal_jrc")
+    )
+    senal_hansen = (
+        ee.Image(perdida_post)
+        .gt(0)
+        .unmask(0)
+        .reproject(crs=proyeccion_referencia)
+        .rename("senal_hansen")
+    )
+    senal_esri_10m = (
+        ee.Image(esri_inicial)
+        .eq(2)
+        .And(ee.Image(esri_final).neq(2))
+        .unmask(0)
+    )
+    senal_esri = (
+        senal_esri_10m.reduceResolution(
+            reducer=ee.Reducer.max(),
+            bestEffort=True,
+            maxPixels=1024,
+        )
+        .reproject(crs=proyeccion_referencia)
+        .gt(0)
+        .rename("senal_esri")
+    )
+    return (
+        senal_jrc.add(senal_hansen)
+        .add(senal_esri)
+        .rename("fuentes_coincidentes")
+        .toByte()
+        .clip(geometria)
+    )
+
+
 def imagen_gedi(geometria):
     return (
         ee.ImageCollection(GEDI_ASSET)
@@ -1223,8 +1420,20 @@ def imagen_gedi(geometria):
     )
 
 
-def capa_gee(mapa, imagen, visualizacion, nombre, mostrar=True, opacidad=1.0, control=True):
+def capa_gee(
+    mapa,
+    imagen,
+    visualizacion,
+    nombre,
+    mostrar=True,
+    opacidad=1.0,
+    control=True,
+    z_index=None,
+):
     datos = ee.Image(imagen).getMapId(visualizacion)
+    opciones_capa = {}
+    if z_index is not None:
+        opciones_capa["z_index"] = int(z_index)
     capa = folium.TileLayer(
         tiles=datos["tile_fetcher"].url_format,
         attr="Google Earth Engine",
@@ -1233,6 +1442,7 @@ def capa_gee(mapa, imagen, visualizacion, nombre, mostrar=True, opacidad=1.0, co
         control=control,
         show=mostrar,
         opacity=opacidad,
+        **opciones_capa,
     )
     capa.add_to(mapa)
     return capa
@@ -1315,6 +1525,13 @@ def ejecutar_analisis(
     esri_inicial = obtener_esri(anio_esri_inicial, geometria)
     esri_final = obtener_esri(anio_esri_final, geometria)
     perdida_post, perdida_pre, linea_base = imagenes_hansen(geometria)
+    coincidencia_revision = imagen_coincidencia_revision(
+        geometria,
+        tmf=tmf,
+        perdida_post=perdida_post,
+        esri_inicial=esri_inicial,
+        esri_final=esri_final,
+    )
     gedi = imagen_gedi(geometria)
     pixel_ha = ee.Image.pixelArea().divide(10000)
 
@@ -1328,6 +1545,15 @@ def ejecutar_analisis(
             tmf.eq(4).unmask(0).multiply(pixel_ha).rename("tmf_recuperacion"),
             tmf.eq(5).unmask(0).multiply(pixel_ha).rename("tmf_agua"),
             tmf.eq(6).unmask(0).multiply(pixel_ha).rename("tmf_otra_cobertura"),
+            coincidencia_revision.eq(1).unmask(0).multiply(pixel_ha).rename(
+                "coincidencia_1_fuente"
+            ),
+            coincidencia_revision.eq(2).unmask(0).multiply(pixel_ha).rename(
+                "coincidencia_2_fuentes"
+            ),
+            coincidencia_revision.eq(3).unmask(0).multiply(pixel_ha).rename(
+                "coincidencia_3_fuentes"
+            ),
         ]
     )
     areas_hansen = ee.Image.cat(
@@ -1405,6 +1631,9 @@ def ejecutar_analisis(
         "tmf_recuperacion",
         "tmf_agua",
         "tmf_otra_cobertura",
+        "coincidencia_1_fuente",
+        "coincidencia_2_fuentes",
+        "coincidencia_3_fuentes",
         "hansen_post",
         "hansen_pre",
         "linea_base",
@@ -1420,6 +1649,15 @@ def ejecutar_analisis(
     resultados["gedi_area_datos"] = numero(resumen, "gedi_area_datos")
     resultados["gedi_cobertura_pct"] = (
         resultados["gedi_area_datos"] / area_ha * 100 if area_ha else 0
+    )
+    resultados["coincidencia_varias_fuentes"] = (
+        resultados["coincidencia_2_fuentes"]
+        + resultados["coincidencia_3_fuentes"]
+    )
+    resultados["pct_coincidencia_varias_fuentes"] = (
+        resultados["coincidencia_varias_fuentes"] / area_ha * 100
+        if area_ha
+        else 0
     )
 
     pct_tmf_defor = resultados["tmf_deforestacion"] / area_ha * 100 if area_ha else 0
@@ -1539,7 +1777,7 @@ def descargar_url_miniatura(url):
 def descargar_miniaturas(especificaciones, geometria, mapas_existentes=None):
     """Descarga los mapas en paralelo y reintenta únicamente los que fallan."""
     # Antes se consultaban estos límites una vez por cada mapa. Una sola consulta
-    # reduce seis viajes innecesarios a Earth Engine.
+    # reduce siete viajes innecesarios a Earth Engine.
     region = geometria.bounds(1).coordinates().getInfo()
     existentes_por_titulo = {
         mapa["titulo"]: mapa
@@ -1632,6 +1870,14 @@ def generar_mapas_reporte(
 
     hansen = ee.Image(HANSEN_ASSET).select("lossyear")
     rgb = obtener_rgb_sentinel(ANO_NDVI_MAX, geometria)
+    perdida_post, _, _ = imagenes_hansen(geometria)
+    coincidencia_revision = imagen_coincidencia_revision(
+        geometria,
+        tmf=tmf,
+        perdida_post=perdida_post,
+        esri_inicial=obtener_esri(ANO_ESRI_MIN, geometria),
+        esri_final=obtener_esri(ANO_ESRI_MAX, geometria),
+    )
 
     especificaciones = [
         (
@@ -1676,6 +1922,21 @@ def generar_mapas_reporte(
                 area_fc,
             ),
             "Rojo: NDVI inferior a 0, sin vegetación activa | Rosado: NDVI 0.0 a menos de 0.2, suelo o cobertura muy escasa | Amarillo: NDVI 0.2 a menos de 0.4, vegetación escasa | Verde claro: NDVI 0.4 a menos de 0.6, vegetación moderada | Verde oscuro: NDVI mayor o igual a 0.6, vegetación densa",
+        ),
+        (
+            "Sectores que requieren revisión - Coincidencia espacial",
+            visualizar_con_borde(
+                coincidencia_revision.updateMask(coincidencia_revision.gt(0)),
+                VIS_COINCIDENCIA_REVISION,
+                area_fc,
+                fondo=rgb,
+            ),
+            (
+                "Amarillo: señal de 1 fuente | Naranja: coincidencia de 2 fuentes | "
+                "Rojo oscuro: coincidencia de 3 fuentes. Integra JRC TMF 2025, "
+                "Hansen posterior a 2020 y ESRI 2017-2024 en una malla común de "
+                "30 m. GEDI y NDVI no participan; el mapa no modifica el índice."
+            ),
         ),
     ]
 
@@ -1836,6 +2097,14 @@ def generar_pdf(
     coincidencia = (
         f"{r['consistencia']['nivel']}: {r['consistencia']['detalle']}"
     )
+    texto_coincidencia_espacial = (
+        f"El mapa 7 ubica {r['coincidencia_1_fuente']:.2f} ha con señal de una "
+        f"fuente, {r['coincidencia_2_fuentes']:.2f} ha con coincidencia de dos "
+        f"fuentes y {r['coincidencia_3_fuentes']:.2f} ha con coincidencia de tres. "
+        f"Priorice las {r['coincidencia_varias_fuentes']:.2f} ha señaladas por dos "
+        "o tres fuentes. Esta superposición no modifica el índice y no demuestra "
+        "por sí sola la causa del cambio."
+    )
     texto_dosel = (
         f"La altura promedio del dosel fue de {r['gedi_altura']:.1f} m. "
         f"El {r['gedi_cobertura_pct']:.0f}% del área presentó datos válidos en el producto de altura."
@@ -1954,6 +2223,19 @@ def generar_pdf(
                 Paragraph("Pérdida Hansen 2001-2020", estilos["CuerpoFicha"]),
                 Paragraph(f"<b>{r['hansen_pre']:.2f} ha</b>", estilos["CuerpoFicha"]),
             ],
+            [
+                Paragraph("Señal espacial de una fuente", estilos["CuerpoFicha"]),
+                Paragraph(
+                    f"<b>{r['coincidencia_1_fuente']:.2f} ha</b>",
+                    estilos["CuerpoFicha"],
+                ),
+                Paragraph("Coincidencia de dos o tres fuentes", estilos["CuerpoFicha"]),
+                Paragraph(
+                    f"<b>{r['coincidencia_varias_fuentes']:.2f} ha "
+                    f"({r['pct_coincidencia_varias_fuentes']:.2f}%)</b>",
+                    estilos["CuerpoFicha"],
+                ),
+            ],
         ],
         colWidths=[4.6 * cm, 3.0 * cm, 4.6 * cm, 3.0 * cm],
     )
@@ -2009,9 +2291,9 @@ def generar_pdf(
         ),
         (
             "¿DÓNDE SE DEBE REVISAR?",
-            "Los sectores resaltados en los mapas temáticos son una referencia visual para "
-            "orientar la revisión. Deben contrastarse con imágenes recientes, registros de "
-            "manejo, información del predio y verificación de campo cuando corresponda.",
+            f"{texto_coincidencia_espacial} Deben contrastarse con imágenes recientes, "
+            "registros de manejo, información del predio y verificación de campo "
+            "cuando corresponda.",
         ),
         ("ACCIÓN RECOMENDADA", texto_recomendacion(r["prioridad"])),
         (
@@ -2085,7 +2367,9 @@ def generar_pdf(
         Paragraph(
             "Nota cartográfica: el contorno celeste identifica el área evaluada. Las imágenes "
             "se generan automáticamente a partir de las fuentes indicadas y deben interpretarse "
-            "junto con las leyendas y las limitaciones metodológicas.",
+            "junto con las leyendas y las limitaciones metodológicas. El mapa 7 estandariza "
+            "JRC, Hansen y ESRI en una malla común de 30 m solo para orientar la ubicación; "
+            "GEDI y NDVI no participan en esa superposición.",
             estilos["CuerpoFicha"],
         )
     )
@@ -2137,7 +2421,8 @@ def generar_pdf(
                 "La preevaluación integró JRC Tropical Moist Forest, Hansen Global Forest "
                 "Change, ESRI Land Use/Land Cover, altura del dosel basada en GEDI y NDVI "
                 "derivado de Sentinel-2. Los cálculos se realizan por fuente en su resolución "
-                "de trabajo; no se interpretan como coincidencias píxel a píxel.",
+                "de trabajo. Únicamente el mapa 7 realiza una superposición espacial "
+                "estandarizada en 30 m para orientar la revisión; no modifica el índice.",
                 estilos["CuerpoFicha"],
             ),
             Paragraph(
@@ -2407,11 +2692,34 @@ def mostrar_resultados(
     else:
         titulo_hallazgo = f"{fuentes_principales} fuentes principales presentan señales"
         detalle_hallazgo = (
-            "La necesidad de revisión aumenta, aunque las fuentes no deben interpretarse como coincidencia píxel a píxel."
+            "La necesidad de revisión aumenta. El mapa de coincidencia permite comprobar "
+            "si las señales también se superponen espacialmente."
         )
         titulo_ubicacion = "Priorice los sectores señalados en varios mapas"
         detalle_ubicacion = (
             "Compare la ubicación visual y luego confróntela con imágenes recientes y documentos del predio."
+        )
+    if resultados["coincidencia_varias_fuentes"] > 0:
+        titulo_ubicacion = (
+            f"Revise primero {resultados['coincidencia_varias_fuentes']:.2f} ha "
+            "con coincidencia espacial"
+        )
+        detalle_ubicacion = (
+            "Active «Sectores que requieren revisión»: naranja indica dos fuentes "
+            "y rojo oscuro tres. Después confronte esos lugares con imágenes "
+            "recientes y documentos del predio."
+        )
+    elif resultados["coincidencia_1_fuente"] > 0:
+        titulo_ubicacion = "Hay señales localizadas, pero ninguna coincide espacialmente"
+        detalle_ubicacion = (
+            "El séptimo mapa las muestra en amarillo como señales de una sola "
+            "fuente. Revise cada producto y mantenga una interpretación cautelosa."
+        )
+    else:
+        titulo_ubicacion = "No se delimitaron sectores en el mapa de coincidencia"
+        detalle_ubicacion = (
+            "No se detectaron píxeles con las tres señales espaciales definidas. "
+            "Consulte los mapas individuales si necesita documentar el área."
         )
     st.markdown(
         f"""
@@ -2496,6 +2804,14 @@ def mostrar_resultados(
                 if resultados["gedi_disponible"]
                 else "Datos insuficientes"
             ),
+        )
+        st.info(
+            f"Mapa «Sectores que requieren revisión»: "
+            f"{resultados['coincidencia_1_fuente']:.2f} ha con señal de una fuente; "
+            f"{resultados['coincidencia_2_fuentes']:.2f} ha con dos fuentes; "
+            f"{resultados['coincidencia_3_fuentes']:.2f} ha con tres fuentes. "
+            "Priorice las coincidencias de dos o tres fuentes. Este mapa no modifica "
+            "el índice y no confirma por sí solo la causa del cambio."
         )
         st.markdown(f"**Acción sugerida:** {texto_recomendacion(prioridad)}")
 
@@ -2645,15 +2961,54 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-with st.expander("Antes de comenzar: qué hace y qué no hace esta herramienta", expanded=False):
+st.markdown(
+    """
+    <section class="resumen-inicial" aria-labelledby="resumen-aplicacion">
+      <h2 id="resumen-aplicacion">¿Qué hace esta aplicación? En palabras sencillas</h2>
+      <p>
+        Imagine que revisa varias fotografías y mapas del mismo terreno, pero cada uno observa
+        algo distinto. Esta aplicación reúne esas miradas para ayudarle a encontrar lugares que
+        conviene revisar con más atención. No necesita conocimientos de mapas digitales.
+      </p>
+      <div class="resumen-principiante" role="list" aria-label="Cómo funciona la aplicación">
+        <article class="resumen-paso" role="listitem">
+          <span class="resumen-paso-numero" aria-hidden="true">1</span>
+          <h3>Usted elige el lugar</h3>
+          <p>Puede seleccionar una finca registrada, dibujar su propia área o revisar toda la cuenca.</p>
+        </article>
+        <article class="resumen-paso" role="listitem">
+          <span class="resumen-paso-numero" aria-hidden="true">2</span>
+          <h3>La aplicación busca señales</h3>
+          <p>Revisa cambios del bosque, pérdida de árboles, uso del suelo, altura del dosel y vigor vegetal.</p>
+        </article>
+        <article class="resumen-paso" role="listitem">
+          <span class="resumen-paso-numero" aria-hidden="true">3</span>
+          <h3>Usted recibe una guía</h3>
+          <p>Obtiene una prioridad de revisión, mapas de los sectores que requieren atención y un informe descargable.</p>
+        </article>
+      </div>
+      <div class="resumen-aclaracion">
+        <strong>Cómo interpretar el resultado:</strong> una prioridad alta no confirma deforestación,
+        una causa específica ni incumplimiento. Indica que varias señales justifican revisar imágenes
+        recientes, documentos del predio y, cuando corresponda, realizar una visita de campo.
+      </div>
+    </section>
+    """,
+    unsafe_allow_html=True,
+)
+
+with st.expander("Ver qué información revisa la aplicación", expanded=False):
     st.markdown(
         """
-        La aplicación identifica **señales que justifican una revisión**, no causas definitivas.
-        El análisis conserva una configuración recomendada para que distintas fincas puedan
-        compararse bajo el mismo criterio. Las opciones técnicas solo son necesarias para
-        exploración especializada y quedan registradas en la ficha metodológica.
+        - **Estado y cambios del bosque (JRC TMF):** muestra cómo se ha clasificado el bosque tropical a través del tiempo.
+        - **Pérdida anual de cobertura arbórea (Hansen):** señala los años en que se detectó pérdida de árboles.
+        - **Uso y cobertura del suelo (ESRI):** ayuda a reconocer cambios entre árboles, cultivos, pastizales, agua y áreas construidas.
+        - **Altura del dosel (GEDI):** aporta información sobre la estructura vertical de la vegetación.
+        - **Vigor vegetal (NDVI de Sentinel-2):** permite observar qué tan activa o densa parece la vegetación; se usa como apoyo visual y no aumenta la prioridad.
 
-        Al finalizar podrá descargar el informe PDF y un archivo JSON con las fuentes,
+        Las señales principales de cambio forestal tienen mayor peso que las señales de apoyo.
+        La configuración se mantiene igual entre análisis para que los resultados puedan compararse.
+        Al finalizar podrá descargar el informe PDF y el registro metodológico JSON con las fuentes,
         períodos, umbrales, pesos y reglas utilizados.
         """
     )
@@ -2836,6 +3191,7 @@ try:
     )
 
     opciones_capas = [
+        "Sectores para revisión",
         "Pérdida Hansen post-2020",
         "Pérdida Hansen 2001-2020",
         "Cobertura arbórea persistente",
@@ -2848,6 +3204,7 @@ try:
         "Vegetación NDVI",
     ]
     nombres_capas = {
+        "Sectores para revisión": "Sectores que requieren revisión (3 fuentes)",
         "Pérdida Hansen post-2020": "Pérdida de árboles posterior a 2020",
         "Pérdida Hansen 2001-2020": "Pérdida histórica de árboles (2001-2020)",
         "Cobertura arbórea persistente": "Cobertura arbórea persistente hasta 2020",
@@ -2862,6 +3219,11 @@ try:
 
     modo_comparador = perfil["comparador"]
     capas_activas = list(perfil["capas"])
+    modo_mapa = (
+        "Comparar años" if modo_comparador != "Sin comparador" else "Explorar capas"
+    )
+    orden_capas_mapa = list(capas_activas)
+    capa_visible_inicial = capas_activas[0] if capas_activas else None
     anio_tmf_inicial, anio_tmf_final = 2020, ANO_TMF_MAX
     anio_esri_inicial, anio_esri_final = ANO_ESRI_MIN, ANO_ESRI_MAX
     anio_ndvi_inicial = 2022
@@ -2873,64 +3235,171 @@ try:
         )
         if personalizar:
             st.info(
-                "Los selectores de años de esta sección solo cambian los mapas y el "
-                "barrido visual. No modifican los períodos fijos del diagnóstico."
+                "El comparador temporal y la exploración de capas funcionan por separado. "
+                "Ninguno modifica los períodos fijos ni el resultado del diagnóstico."
             )
-            modo_comparador = st.selectbox(
-                "Comparador visual:",
-                ["JRC TMF", "ESRI LULC", "Sin comparador"],
-                index=["JRC TMF", "ESRI LULC", "Sin comparador"].index(modo_comparador),
+            modo_mapa = st.radio(
+                "¿Cómo desea usar el mapa?",
+                ["Explorar capas", "Comparar años"],
+                index=0 if modo_mapa == "Explorar capas" else 1,
                 help=(
-                    "JRC compara visualmente el estado del bosque; ESRI compara el uso "
-                    "y la cobertura del suelo. La elección no modifica el índice."
+                    "Explorar capas permite encender varias capas y ordenarlas. Comparar "
+                    "años muestra únicamente el barrido temporal para evitar que una capa "
+                    "oculte la comparación."
                 ),
             )
-            if modo_comparador == "JRC TMF":
-                anio_tmf_inicial = st.selectbox(
-                    "Año inicial para visualizar (JRC):",
-                    list(range(1990, ANO_TMF_MAX)),
-                    index=list(range(1990, ANO_TMF_MAX)).index(2020),
+            if modo_mapa == "Comparar años":
+                capas_activas = []
+                orden_capas_mapa = []
+                capa_visible_inicial = None
+                opciones_comparador = ["JRC TMF", "ESRI LULC", "NDVI Sentinel-2"]
+                comparador_inicial = (
+                    modo_comparador
+                    if modo_comparador in opciones_comparador
+                    else "JRC TMF"
                 )
-                anio_tmf_final = st.selectbox(
-                    "Año final para visualizar (JRC):",
-                    list(range(anio_tmf_inicial + 1, ANO_TMF_MAX + 1)),
-                    index=len(list(range(anio_tmf_inicial + 1, ANO_TMF_MAX + 1))) - 1,
+                modo_comparador = st.selectbox(
+                    "Información que desea comparar:",
+                    opciones_comparador,
+                    index=opciones_comparador.index(comparador_inicial),
+                    help=(
+                        "JRC compara el estado del bosque; ESRI compara el uso y la "
+                        "cobertura del suelo; NDVI compara clases de vigor vegetal."
+                    ),
                 )
-                st.caption(
-                    f"Estos años cambian únicamente el barrido visual. El diagnóstico "
-                    f"utiliza siempre JRC TMF {ANO_DIAG_TMF}, igual que el visor GEE original."
+                if modo_comparador == "JRC TMF":
+                    anio_tmf_inicial = st.selectbox(
+                        "Año inicial para visualizar (JRC):",
+                        list(range(1990, ANO_TMF_MAX)),
+                        index=list(range(1990, ANO_TMF_MAX)).index(2020),
+                    )
+                    anio_tmf_final = st.selectbox(
+                        "Año final para visualizar (JRC):",
+                        list(range(anio_tmf_inicial + 1, ANO_TMF_MAX + 1)),
+                        index=len(list(range(anio_tmf_inicial + 1, ANO_TMF_MAX + 1))) - 1,
+                    )
+                    st.caption(
+                        f"Estos años cambian únicamente el barrido visual. El diagnóstico "
+                        f"utiliza siempre JRC TMF {ANO_DIAG_TMF}."
+                    )
+                elif modo_comparador == "ESRI LULC":
+                    anio_esri_inicial = st.selectbox(
+                        "Año inicial para visualizar (ESRI):",
+                        list(range(ANO_ESRI_MIN, ANO_ESRI_MAX)),
+                    )
+                    anio_esri_final = st.selectbox(
+                        "Año final para visualizar (ESRI):",
+                        list(range(anio_esri_inicial + 1, ANO_ESRI_MAX + 1)),
+                        index=len(list(range(anio_esri_inicial + 1, ANO_ESRI_MAX + 1))) - 1,
+                    )
+                else:
+                    anio_ndvi_inicial = st.selectbox(
+                        "Año inicial para visualizar (NDVI):",
+                        list(range(2017, ANO_NDVI_MAX)),
+                        index=list(range(2017, ANO_NDVI_MAX)).index(2022),
+                    )
+                    st.caption(
+                        f"El lado derecho mostrará NDVI {ANO_NDVI_MAX}. Esta comparación "
+                        "es visual y no modifica el índice de prioridad."
+                    )
+            else:
+                modo_comparador = "Sin comparador"
+                capas_seleccionadas = st.multiselect(
+                    "Capas disponibles en el mapa:",
+                    opciones_capas,
+                    default=capas_activas,
+                    format_func=lambda valor: nombres_capas[valor],
+                    help=(
+                        "Las capas seleccionadas quedarán disponibles dentro del mapa. "
+                        "Podrá encender varias a la vez sin eliminarlas."
+                    ),
                 )
-            if modo_comparador == "ESRI LULC":
-                anio_esri_inicial = st.selectbox(
-                    "Año inicial para visualizar (ESRI):",
-                    list(range(ANO_ESRI_MIN, ANO_ESRI_MAX)),
+                orden_guardado = st.session_state.get(
+                    "orden_capas_personalizado",
+                    [],
                 )
-                anio_esri_final = st.selectbox(
-                    "Año final para visualizar (ESRI):",
-                    list(range(anio_esri_inicial + 1, ANO_ESRI_MAX + 1)),
-                    index=len(list(range(anio_esri_inicial + 1, ANO_ESRI_MAX + 1))) - 1,
+                orden_capas_mapa = [
+                    nombre for nombre in orden_guardado if nombre in capas_seleccionadas
+                ]
+                orden_capas_mapa.extend(
+                    nombre
+                    for nombre in capas_seleccionadas
+                    if nombre not in orden_capas_mapa
                 )
-            capas_activas = st.multiselect(
-                "Capas disponibles en el mapa:",
-                opciones_capas,
-                default=capas_activas,
-                format_func=lambda valor: nombres_capas[valor],
-                help=(
-                    "Elija qué capas estarán disponibles. Dentro del mapa podrá mostrar "
-                    "una sola capa temática a la vez."
-                ),
-            )
-            anio_ndvi_inicial = st.selectbox(
-                "Año inicial para visualizar el cambio NDVI:",
-                list(range(2017, ANO_NDVI_MAX)),
-                index=list(range(2017, ANO_NDVI_MAX)).index(2022),
-                disabled="ΔNDVI" not in capas_activas,
-            )
+                st.session_state["orden_capas_personalizado"] = orden_capas_mapa
+                capas_activas = list(orden_capas_mapa)
+
+                if orden_capas_mapa:
+                    st.markdown("**Orden visual · arriba → abajo**")
+                    st.caption(
+                        "Si enciende varias capas, la primera de esta lista se dibuja por encima de las demás."
+                    )
+                    for posicion, nombre in enumerate(orden_capas_mapa, start=1):
+                        st.caption(f"{posicion}. {nombres_capas[nombre]}")
+
+                    clave_capa_mover = "capa_a_reordenar"
+                    if st.session_state.get(clave_capa_mover) not in orden_capas_mapa:
+                        st.session_state[clave_capa_mover] = orden_capas_mapa[0]
+                    capa_a_mover = st.selectbox(
+                        "Capa que desea mover:",
+                        orden_capas_mapa,
+                        format_func=lambda valor: nombres_capas[valor],
+                        key=clave_capa_mover,
+                    )
+                    columna_subir, columna_bajar = st.columns(2)
+                    if columna_subir.button(
+                        "Subir capa",
+                        use_container_width=True,
+                        disabled=orden_capas_mapa.index(capa_a_mover) == 0,
+                    ):
+                        indice = orden_capas_mapa.index(capa_a_mover)
+                        orden_capas_mapa[indice - 1], orden_capas_mapa[indice] = (
+                            orden_capas_mapa[indice],
+                            orden_capas_mapa[indice - 1],
+                        )
+                        st.session_state["orden_capas_personalizado"] = orden_capas_mapa
+                        st.rerun()
+                    if columna_bajar.button(
+                        "Bajar capa",
+                        use_container_width=True,
+                        disabled=orden_capas_mapa.index(capa_a_mover) == len(orden_capas_mapa) - 1,
+                    ):
+                        indice = orden_capas_mapa.index(capa_a_mover)
+                        orden_capas_mapa[indice + 1], orden_capas_mapa[indice] = (
+                            orden_capas_mapa[indice],
+                            orden_capas_mapa[indice + 1],
+                        )
+                        st.session_state["orden_capas_personalizado"] = orden_capas_mapa
+                        st.rerun()
+
+                    clave_capa_inicial = "capa_visible_inicial_personalizada"
+                    if st.session_state.get(clave_capa_inicial) not in orden_capas_mapa:
+                        st.session_state[clave_capa_inicial] = orden_capas_mapa[0]
+                    capa_visible_inicial = st.selectbox(
+                        "Capa visible al abrir el mapa:",
+                        orden_capas_mapa,
+                        format_func=lambda valor: nombres_capas[valor],
+                        key=clave_capa_inicial,
+                        help="Las demás capas permanecen disponibles en el control del mapa.",
+                    )
+                else:
+                    capa_visible_inicial = None
+                    st.warning("Seleccione al menos una capa para mostrar información temática.")
+
+                anio_ndvi_inicial = st.selectbox(
+                    "Año inicial para visualizar el cambio NDVI:",
+                    list(range(2017, ANO_NDVI_MAX)),
+                    index=list(range(2017, ANO_NDVI_MAX)).index(2022),
+                    disabled="ΔNDVI" not in capas_activas,
+                )
         else:
+            if modo_mapa == "Comparar años":
+                capas_activas = []
+                orden_capas_mapa = []
+                capa_visible_inicial = None
             st.caption(
-                f"Vista recomendada: JRC 2020-{ANO_TMF_MAX}, "
-                f"ESRI {ANO_ESRI_MIN}-{ANO_ESRI_MAX} y NDVI 2022-{ANO_NDVI_MAX}. "
-                "Estos períodos corresponden a los mapas, no al cálculo."
+                "La vista recomendada mantiene separados el comparador temporal y "
+                "las capas temáticas. Estos mapas no modifican el cálculo."
             )
 
     firma_analisis_actual = (
@@ -2943,13 +3412,15 @@ try:
     )
     firma_visual_actual = (
         firma_analisis_actual,
+        modo_mapa,
         modo_comparador,
         anio_tmf_inicial,
         anio_tmf_final,
         anio_esri_inicial,
         anio_esri_final,
         anio_ndvi_inicial,
-        tuple(capas_activas),
+        tuple(orden_capas_mapa),
+        capa_visible_inicial,
     )
     analisis_actual = (
         st.session_state.get("firma_analisis") == firma_analisis_actual
@@ -2962,8 +3433,8 @@ try:
         <div class="contexto-analisis">
           <div class="contexto-item"><small>Área</small><strong>{html_lib.escape(nombre_area)}</strong></div>
           <div class="contexto-item"><small>Superficie</small><strong>{superficie_ha:,.1f} ha</strong></div>
-          <div class="contexto-item"><small>Vista inicial</small><strong>{html_lib.escape(objetivo)}</strong></div>
-          <div class="contexto-item"><small>Configuración</small><strong>{'Personalizada' if personalizar else 'Recomendada'}</strong></div>
+          <div class="contexto-item"><small>Modo de mapa</small><strong>{html_lib.escape(modo_mapa)}</strong></div>
+          <div class="contexto-item"><small>Vista</small><strong>{html_lib.escape(objetivo)}</strong></div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -3000,7 +3471,7 @@ try:
 
     st.subheader("Ejecutar y revisar resultados")
     st.caption(
-        "Primero se calcularán únicamente las señales y el resumen. El informe con seis mapas "
+        "Primero se calcularán únicamente las señales y el resumen. El informe con siete mapas "
         "se preparará después, solo si usted lo solicita. "
         f"Referencia fija {ANO_REFERENCIA_ANALISIS}: JRC y Hansen "
         f"{ANO_REFERENCIA_ANALISIS}, con ESRI {ANO_ESRI_MIN}-{ANO_ESRI_MAX}. "
@@ -3084,7 +3555,7 @@ try:
                 use_container_width=True,
                 key="preparar-informe-pdf",
                 help=(
-                    "Solicita en paralelo las seis imágenes temáticas a Earth Engine y arma "
+                    "Solicita en paralelo las siete imágenes temáticas a Earth Engine y arma "
                     "el documento. Si ya existe un informe parcial, vuelve a intentar los mapas."
                 ),
             )
@@ -3103,7 +3574,7 @@ try:
                 ) as estado_informe:
                     try:
                         estado_informe.write(
-                            "Solicitando seis mapas a Earth Engine en grupos de tres."
+                            "Solicitando siete mapas a Earth Engine en grupos de tres."
                         )
                         mapas_reporte, errores_mapas = generar_mapas_reporte(
                             tipo_area,
@@ -3122,7 +3593,7 @@ try:
                             1 for mapa_reporte in mapas_reporte if mapa_reporte.get("imagen")
                         )
                         estado_informe.write(
-                            f"Earth Engine entregó {disponibles} de 6 mapas. Armando el PDF."
+                            f"Earth Engine entregó {disponibles} de 7 mapas. Armando el PDF."
                         )
                         st.session_state["errores_mapas"] = errores_mapas
                         st.session_state["mapas_reporte"] = mapas_reporte
@@ -3178,7 +3649,7 @@ try:
             )
         else:
             columna_pdf.caption(
-                "El PDF se prepara por separado. Los seis mapas se solicitan en paralelo para reducir la espera."
+                "El PDF se prepara por separado. Los siete mapas se solicitan en paralelo para reducir la espera."
             )
         columna_metodo.download_button(
             "Descargar registro metodológico",
@@ -3198,10 +3669,10 @@ try:
         if st.session_state.get("firma_informe") == firma_visual_actual:
             errores_mapas = st.session_state.get("errores_mapas", [])
             if errores_mapas:
-                disponibles = 6 - len(errores_mapas)
+                disponibles = 7 - len(errores_mapas)
                 if disponibles:
                     st.warning(
-                        f"El informe contiene {disponibles} de 6 mapas. Algunas imágenes no "
+                        f"El informe contiene {disponibles} de 7 mapas. Algunas imágenes no "
                         "estuvieron disponibles temporalmente; puede volver a preparar el PDF."
                     )
                 else:
@@ -3258,6 +3729,7 @@ try:
             VIS_TMF,
             etiqueta_inicial,
             control=False,
+            z_index=200,
         )
         capa_derecha = capa_gee(
             mapa,
@@ -3265,6 +3737,7 @@ try:
             VIS_TMF,
             etiqueta_final,
             control=False,
+            z_index=200,
         )
     elif modo_comparador == "ESRI LULC":
         etiqueta_inicial = f"ESRI {anio_esri_inicial}"
@@ -3275,6 +3748,7 @@ try:
             VIS_ESRI,
             etiqueta_inicial,
             control=False,
+            z_index=200,
         )
         capa_derecha = capa_gee(
             mapa,
@@ -3282,6 +3756,26 @@ try:
             VIS_ESRI,
             etiqueta_final,
             control=False,
+            z_index=200,
+        )
+    elif modo_comparador == "NDVI Sentinel-2":
+        etiqueta_inicial = f"NDVI {anio_ndvi_inicial}"
+        etiqueta_final = f"NDVI {ANO_NDVI_MAX}"
+        capa_izquierda = capa_gee(
+            mapa,
+            clasificar_ndvi(obtener_ndvi(anio_ndvi_inicial, geometria)),
+            VIS_NDVI_CLASES,
+            etiqueta_inicial,
+            control=False,
+            z_index=200,
+        )
+        capa_derecha = capa_gee(
+            mapa,
+            clasificar_ndvi(obtener_ndvi(ANO_NDVI_MAX, geometria)),
+            VIS_NDVI_CLASES,
+            etiqueta_final,
+            control=False,
+            z_index=200,
         )
     if capa_izquierda is not None and capa_derecha is not None:
         SideBySideLayers(
@@ -3289,27 +3783,34 @@ try:
             layer_right=capa_derecha,
         ).add_to(mapa)
 
-    # El control exclusivo evita que varias capas temáticas se oculten entre sí.
-    # Sin comparador se muestra inicialmente la primera capa disponible; durante
-    # un barrido comienzan todas apagadas para no cubrir los años comparados.
-    mostrar_primera_tematica = modo_comparador == "Sin comparador"
+    # En el modo de capas, el z-index conserva el orden configurado aunque una
+    # capa se apague y se vuelva a encender desde el control del mapa.
+    prioridades_capas = {
+        nombre: 400 + (len(orden_capas_mapa) - indice) * 10
+        for indice, nombre in enumerate(orden_capas_mapa)
+    }
     capas_tematicas_mapa = []
 
-    def agregar_tematica(imagen, visualizacion, nombre):
+    def agregar_tematica(clave, imagen, visualizacion, nombre):
         capa = capa_gee(
             mapa,
             imagen,
             visualizacion,
             nombre,
-            mostrar=mostrar_primera_tematica and not capas_tematicas_mapa,
+            mostrar=(
+                modo_comparador == "Sin comparador"
+                and clave == capa_visible_inicial
+            ),
+            z_index=prioridades_capas.get(clave, 400),
         )
-        capas_tematicas_mapa.append(capa)
+        capas_tematicas_mapa.append((clave, capa))
         return capa
 
     perdida_post = perdida_pre = linea_base = None
     if any(
         nombre in capas_activas
         for nombre in [
+            "Sectores para revisión",
             "Pérdida Hansen post-2020",
             "Pérdida Hansen 2001-2020",
             "Cobertura arbórea persistente",
@@ -3317,38 +3818,59 @@ try:
     ):
         perdida_post, perdida_pre, linea_base = imagenes_hansen(geometria)
 
+    if "Sectores para revisión" in capas_activas:
+        coincidencia_revision = imagen_coincidencia_revision(
+            geometria,
+            tmf=obtener_tmf(ANO_DIAG_TMF, geometria),
+            perdida_post=perdida_post,
+            esri_inicial=obtener_esri(ANO_ESRI_MIN, geometria),
+            esri_final=obtener_esri(ANO_ESRI_MAX, geometria),
+        )
+        agregar_tematica(
+            "Sectores para revisión",
+            coincidencia_revision.updateMask(coincidencia_revision.gt(0)),
+            VIS_COINCIDENCIA_REVISION,
+            "Sectores que requieren revisión · JRC + Hansen + ESRI",
+        )
+
     if "Pérdida Hansen post-2020" in capas_activas:
         agregar_tematica(
+            "Pérdida Hansen post-2020",
             perdida_post,
             VIS_HANSEN_POST,
             f"Hansen 2021-{ANO_HANSEN_MAX}",
         )
     if "Pérdida Hansen 2001-2020" in capas_activas:
         agregar_tematica(
+            "Pérdida Hansen 2001-2020",
             perdida_pre,
             VIS_HANSEN_PRE,
             "Hansen 2001-2020",
         )
     if "Cobertura arbórea persistente" in capas_activas:
         agregar_tematica(
+            "Cobertura arbórea persistente",
             linea_base,
             VIS_LINEA_BASE,
             "Cobertura arbórea persistente",
         )
     if "Deforestación JRC" in capas_activas:
         agregar_tematica(
+            "Deforestación JRC",
             obtener_tmf(ANO_DIAG_TMF, geometria).eq(3).selfMask(),
             VIS_TMF_DEFOR,
             f"Deforestación JRC {ANO_DIAG_TMF}",
         )
     if "Degradación JRC" in capas_activas:
         agregar_tematica(
+            "Degradación JRC",
             obtener_tmf(ANO_DIAG_TMF, geometria).eq(2).selfMask(),
             VIS_TMF_DEGRAD,
             f"Degradación JRC {ANO_DIAG_TMF}",
         )
     if "Uso y cobertura ESRI" in capas_activas:
         agregar_tematica(
+            "Uso y cobertura ESRI",
             obtener_esri_visual(anio_esri_final, geometria),
             VIS_ESRI,
             f"Uso y cobertura ESRI {anio_esri_final}",
@@ -3364,6 +3886,7 @@ try:
             .selfMask()
         )
         agregar_tematica(
+            "Transiciones ESRI",
             transicion,
             VIS_ESRI_CAMBIO,
             f"Transiciones ESRI {anio_esri_inicial}-{anio_esri_final}",
@@ -3371,6 +3894,7 @@ try:
     if "Altura GEDI" in capas_activas:
         gedi = imagen_gedi(geometria)
         agregar_tematica(
+            "Altura GEDI",
             gedi,
             VIS_GEDI,
             "Altura del dosel GEDI",
@@ -3382,12 +3906,14 @@ try:
         ndvi_inicial = obtener_ndvi(anio_ndvi_inicial, geometria)
         delta_ndvi = ndvi_final.subtract(ndvi_inicial).rename("delta_ndvi")
         agregar_tematica(
+            "ΔNDVI",
             delta_ndvi,
             VIS_NDVI_DELTA,
             f"ΔNDVI {anio_ndvi_inicial}-{ANO_NDVI_MAX}",
         )
     if "Vegetación NDVI" in capas_activas:
         agregar_tematica(
+            "Vegetación NDVI",
             clasificar_ndvi(ndvi_final),
             VIS_NDVI_CLASES,
             f"Vegetación NDVI {ANO_NDVI_MAX}",
@@ -3399,12 +3925,14 @@ try:
         cuenca.style(color="FF4444", fillColor="00000000", width=3),
         {},
         "Límite de la cuenca",
+        z_index=1000,
     )
     capa_area_seleccionada = capa_gee(
         mapa,
         area_seleccionada.style(color="00E5FF", fillColor="00E5FF18", width=4),
         {},
         "Área seleccionada",
+        z_index=1010,
     )
     limites_area = obtener_limites(area_seleccionada)
     if etiqueta_inicial and etiqueta_final:
@@ -3416,22 +3944,18 @@ try:
         )
     mapa.fit_bounds(limites_area)
     if capas_tematicas_mapa:
-        sin_capa_tematica = folium.FeatureGroup(
-            name="Sin capa temática",
-            overlay=True,
-            control=True,
-            show=not mostrar_primera_tematica,
-        )
-        sin_capa_tematica.add_to(mapa)
+        capas_por_clave = dict(capas_tematicas_mapa)
+        capas_control = [
+            capas_por_clave[nombre]
+            for nombre in orden_capas_mapa
+            if nombre in capas_por_clave
+        ]
         GroupedLayerControl(
             groups={
-                "Capa temática · seleccione una": [
-                    sin_capa_tematica,
-                    *capas_tematicas_mapa,
-                ]
+                "Capas temáticas · puede combinar varias": capas_control
             },
-            exclusive_groups=True,
-            collapsed=True,
+            exclusive_groups=False,
+            collapsed=False,
         ).add_to(mapa)
     GroupedLayerControl(
         groups={
@@ -3457,13 +3981,14 @@ try:
         )
         st.caption(
             "Arrastre el control circular del divisor vertical. El lado izquierdo muestra el "
-            "año inicial y el derecho el año final. Las capas temáticas comienzan apagadas "
-            "para no cubrir el barrido. Al seleccionar una, la anterior se apaga automáticamente."
+            "año inicial y el derecho el año final. Este modo muestra únicamente la comparación "
+            "temporal para que ninguna capa temática la cubra."
         )
     else:
         st.caption(
-            "Use «Capa temática» dentro del mapa para cambiar de información sin superponerla. "
-            "Los límites del área se controlan por separado en «Referencias»."
+            "Use «Capas temáticas» dentro del mapa para encender o apagar una o varias capas. "
+            "Su orden se controla en el panel lateral; los límites permanecen arriba y se "
+            "administran por separado en «Referencias»."
         )
     st_folium(
         mapa,
@@ -3471,9 +3996,10 @@ try:
         use_container_width=True,
         returned_objects=[],
         key=(
-            f"mapa-{APP_VERSION}-{tipo_area}-{finca_seleccionada}-{modo_comparador}-"
+            f"mapa-{APP_VERSION}-{tipo_area}-{finca_seleccionada}-{modo_mapa}-{modo_comparador}-"
             f"{anio_tmf_inicial}-{anio_tmf_final}-{anio_esri_inicial}-"
-            f"{anio_esri_final}-{anio_ndvi_inicial}-{'-'.join(capas_activas)}-"
+            f"{anio_esri_final}-{anio_ndvi_inicial}-{'-'.join(orden_capas_mapa)}-"
+            f"{capa_visible_inicial}-"
             f"{hash(geometria_dibujada_json or '')}"
         ),
     )
@@ -3481,7 +4007,7 @@ try:
     with st.expander("Ver leyendas de colores", expanded=True):
         columnas_leyenda = st.columns(2)
         leyendas_activas = []
-        if modo_comparador in ("JRC TMF", "ESRI LULC"):
+        if modo_comparador in ("JRC TMF", "ESRI LULC", "NDVI Sentinel-2"):
             leyendas_activas.append((modo_comparador, LEYENDAS[modo_comparador]))
         for nombre in capas_activas:
             if nombre in LEYENDAS:
@@ -3504,7 +4030,7 @@ try:
                 |---|---:|---:|---|
                 | JRC Tropical Moist Forest | Estado {ANO_DIAG_TMF} | 30 m | Señales de degradación y deforestación |
                 | Hansen Global Forest Change | 2001-{ANO_HANSEN_MAX}; corte {CUTOFF_LABEL} | 30 m | Pérdida de cobertura arbórea |
-                | ESRI Land Use/Land Cover | {anio_esri_inicial}-{anio_esri_final} | 10 m | Transiciones de la clase árboles |
+                | ESRI Land Use/Land Cover | Diagnóstico {ANO_ESRI_MIN}-{ANO_ESRI_MAX} | 10 m | Transiciones de la clase árboles |
                 | GEDI / OpenForis | Producto disponible | 100 m | Altura y cobertura válida del dosel |
                 | Sentinel-2 SR Harmonized | {anio_ndvi_inicial}-{ANO_NDVI_MAX} | 10 m | Vigor vegetal; apoyo visual |
                 """
@@ -3524,6 +4050,9 @@ try:
                 4. El índice suma cada fuente una sola vez: **JRC 2.0**, **Hansen 2.0**,
                    **ESRI 1.5**, **GEDI 0.5** y **NDVI 0.0**.
                 5. La prioridad es **alta desde 3.0**, **media desde 1.5**, **preventiva desde 0.5** y **baja por debajo de 0.5**.
+                6. El mapa **Sectores que requieren revisión** suma, en una malla común
+                   de 30 m, las señales binarias de JRC, Hansen y ESRI. Muestra una,
+                   dos o tres fuentes coincidentes, pero **no modifica el índice**.
 
                 El NDVI se calcula como `(B8 - B4) / (B8 + B4)` y se utiliza únicamente
                 como apoyo visual. No modifica el índice de prioridad.
@@ -3575,6 +4104,17 @@ try:
             st.caption(
                 "La consistencia complementa la interpretación y nunca suma, resta ni "
                 "compensa puntos del índice."
+            )
+            st.markdown("**Mapa de coincidencia espacial**")
+            st.markdown(
+                "\n".join(
+                    [
+                        "- **1 fuente · amarillo:** señal aislada; revise el producto correspondiente.",
+                        "- **2 fuentes · naranja:** coincidencia espacial que merece revisión prioritaria.",
+                        "- **3 fuentes · rojo oscuro:** coincidencia espacial de las tres fuentes principales.",
+                        f"- **Limitación:** {REGLAS_MAPA_COINCIDENCIA['limitacion']}",
+                    ]
+                )
             )
         with tab_limites:
             st.markdown(
