@@ -4,7 +4,22 @@ Este historial documenta la evolución de la aplicación UX. Las versiones sigue
 el formato `MAJOR.MINOR.PATCH`: una versión principal, mejoras compatibles y
 correcciones compatibles, respectivamente.
 
-## [0.2.8] - 2026-08-01 — versión actual
+## [0.2.9] - 2026-08-03 — versión actual
+
+### Vistas y períodos comprensibles
+
+- Se eliminaron las etiquetas que presentaban JRC como vista recomendada frente a
+  ESRI; las cuatro opciones principales ahora describen acciones neutrales.
+- **Consultar capas individuales** pasó al selector principal y permite elegir un
+  solo año para JRC, ESRI o NDVI sin activar el comparador.
+- Los barridos de JRC, ESRI y NDVI quedaron como tres opciones independientes con
+  selección explícita de año inicial y final.
+- El orden de las capas y la capa visible al abrir continúan disponibles, pero en
+  un panel secundario que no interfiere con la selección principal.
+- La interfaz y la documentación distinguen el comparador JRC 2020-2025 del
+  diagnóstico JRC 2025, la pérdida Hansen 2021-2025 y la transición ESRI 2017-2024.
+
+## [0.2.8] - 2026-08-01
 
 ### Comparador y explorador de capas independientes
 
