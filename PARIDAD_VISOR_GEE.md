@@ -2,7 +2,7 @@
 
 **Documento de referencia:** `Visor_PreEvaluacion_Territorial_NATURA_Documentacion.docx`
 
-**Implementación Streamlit:** UX-0.2.8
+**Implementación Streamlit:** UX-0.2.9
 
 **Método:** MT-2026.4
 
@@ -17,9 +17,9 @@ su uso, pero las fuentes, las comparaciones y el diagnóstico permanecen disponi
 | Polígono dibujado por el usuario | Herramienta de dibujo y análisis del GeoJSON recortado a la cuenca |
 | Comparador visual JRC | Barrido sincronizado entre año inicial y final, con rótulos visibles |
 | Comparador visual ESRI | Barrido sincronizado entre año inicial y final |
-| Comparador visual NDVI | Barrido entre el año inicial seleccionado y 2025 con clases de vigor; no altera el índice |
-| Selección de años | Controles visuales JRC, ESRI y NDVI; no alteran el diagnóstico fijo de referencia 2025 (ESRI 2017-2024) |
-| Capas temáticas | JRC, Hansen histórico y posterior a 2020, línea base, ESRI, GEDI, NDVI y sectores que requieren revisión; pueden combinarse y ordenarse cuando se utiliza el explorador sin comparador |
+| Comparador visual NDVI | Barrido entre dos años seleccionados con clases de vigor; no altera el índice |
+| Selección de años | Comparadores visuales JRC, ESRI y NDVI; no alteran JRC 2025, Hansen 2021-2025 ni ESRI 2017-2024 usados por el diagnóstico |
+| Capas temáticas | JRC, Hansen histórico y posterior a 2020, línea base, ESRI, GEDI, NDVI y sectores que requieren revisión; JRC, ESRI y NDVI admiten consulta de un solo año sin comparador, y las capas pueden combinarse y ordenarse |
 | Leyenda activa | Leyendas dependientes del comparador y de las capas seleccionadas |
 | JRC TMF | Seis clases, estadísticas, mapa, gráfico y señal ponderada |
 | Hansen GFC | Cobertura persistente a 2020, pérdida 2001-2020 y pérdida posterior a 2020 |

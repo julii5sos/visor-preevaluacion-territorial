@@ -2,7 +2,7 @@
 
 **Versión del método:** MT-2026.4
 
-**Versión de implementación auditada:** UX-0.2.8
+**Versión de implementación auditada:** UX-0.2.9
 
 ## Finalidad y alcance
 
@@ -28,20 +28,25 @@ JRC, Hansen y ESRI en una malla común.
 
 ## Períodos fijos y controles visuales
 
-La referencia metodológica del diagnóstico es **2025**. Para que todas las áreas
-sean comparables, el cálculo usa períodos fijos:
+Para que todas las áreas sean comparables, el cálculo usa períodos fijos:
 
-- JRC Tropical Moist Forest: diagnóstico 2025.
-- Hansen Global Forest Change: edición 2025 y pérdidas posteriores al 31/12/2020.
+- JRC Tropical Moist Forest: estado forestal 2025. La señal mide las clases de
+  degradación y deforestación de la banda `Dec2025`; no resta 2020 de 2025.
+- Hansen Global Forest Change: edición 2025 y pérdidas 2021-2025, posteriores al
+  corte de referencia del 31/12/2020.
 - ESRI Land Use/Land Cover: transición 2017-2024, porque 2024 es la última
   anualidad disponible en la serie utilizada.
 - GEDI: producto estructural configurado en la metodología.
 - NDVI: evidencia visual hasta 2025 y aporte 0.0 al índice.
 
-Los años que el usuario selecciona en el modo técnico modifican únicamente el
-comparador JRC, ESRI o NDVI, los mapas interactivos y las imágenes cartográficas.
-El comparador temporal y el explorador de capas se presentan como modos separados.
-Ninguno cambia los períodos fijos usados para calcular señales, puntaje o prioridad.
+El valor inicial 2020 del comparador JRC corresponde al año del corte de referencia
+EUDR y 2025 al estado más reciente del producto; ese barrido es exclusivamente
+visual. En ESRI se muestran 2017 y 2024 por ser los extremos de la serie utilizada.
+
+Los años que el usuario selecciona modifican únicamente los mapas interactivos y
+las imágenes cartográficas. La consulta de una capa anual y los comparadores de dos
+años se presentan como opciones separadas. Ninguna cambia los períodos fijos usados
+para calcular señales, puntaje o prioridad.
 
 Para JRC TMF se calculan las seis clases anuales: bosque estable, degradación,
 deforestación, recuperación, agua y otra cobertura. Las seis se muestran en las

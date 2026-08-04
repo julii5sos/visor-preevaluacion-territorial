@@ -7,7 +7,7 @@ cumplimiento EUDR.
 
 ## Versión actual
 
-La versión principal de la nueva experiencia es **v0.2.7**. El historial completo
+La versión principal de la nueva experiencia es **v0.2.9**. El historial completo
 de mejoras y correcciones está disponible en [CHANGELOG.md](CHANGELOG.md), y el
 método reproducible se documenta en [METODOLOGIA.md](METODOLOGIA.md). La
 correspondencia con el visor original de Google Earth Engine está registrada en
@@ -16,25 +16,26 @@ correspondencia con el visor original de Google Earth Engine está registrada en
 ## Flujo para el usuario
 
 1. Seleccionar una finca, dibujar un polígono o, para un resumen regional, toda la cuenca.
-2. Elegir qué mapas desea ver primero:
-   - panorama forestal;
-   - uso del suelo;
-   - vegetación;
-   - exploración visual personalizada.
+2. Elegir cómo desea visualizar el área:
+   - consultar capas individuales, con un solo año para JRC, ESRI o NDVI;
+   - comparar el estado forestal entre dos años con JRC;
+   - comparar el uso y cobertura del suelo entre dos años con ESRI;
+   - comparar el vigor vegetal entre dos años con NDVI.
 3. Pulsar **Ejecutar análisis**.
 4. Revisar la lectura sencilla, el detalle técnico y los mapas.
 5. Descargar el informe PDF con siete mapas temáticos.
 
-La vista elegida no cambia el cálculo: únicamente organiza la visualización. La
-referencia metodológica es 2025; se utilizan JRC
-2025, Hansen 2025 y ESRI 2017-2024, última serie disponible. Los años del modo
-técnico modifican solamente la visualización de los mapas.
+La vista elegida no cambia el cálculo. El diagnóstico utiliza el estado JRC 2025,
+la pérdida Hansen 2021-2025 posterior al corte del 31/12/2020 y la transición
+ESRI 2017-2024. Los años seleccionados por el usuario modifican solamente los
+mapas.
 
-La exploración personalizada separa dos modos. **Comparar años** muestra
-únicamente el barrido temporal JRC, ESRI o NDVI. **Explorar capas** permite
-encender varias capas sin eliminarlas, ordenar cuál queda arriba y elegir cuál
-aparece visible al abrir el mapa. Los límites permanecen por encima de la
-información temática en un control de referencias separado.
+**Consultar capas individuales** permite encender varias capas sin eliminarlas,
+ordenar cuál queda arriba y elegir cuál aparece visible al abrir el mapa. Las
+capas JRC, ESRI y NDVI permiten escoger un solo año sin activar el barrido. Los
+tres comparadores temporales se presentan como opciones principales separadas.
+Los límites permanecen por encima de la información temática en un control de
+referencias independiente.
 
 ### Área dibujada
 
@@ -151,9 +152,9 @@ fincas ni el código de acceso en el repositorio.
 El archivo `app_experiencia.py` contiene una segunda aplicación con el mismo motor
 territorial de `app.py`, pero con un recorrido pensado para usuarios no especialistas:
 
-- selección del área y del objetivo en dos pasos;
-- configuración científica recomendada por defecto;
-- controles técnicos mediante divulgación progresiva;
+- selección del área y del modo de visualización en dos pasos;
+- consulta de capas de un año y comparadores temporales claramente separados;
+- orden de capas mediante divulgación progresiva;
 - resumen en lenguaje sencillo y evidencia por fuente;
 - mapas interactivos, informe PDF y registro metodológico JSON;
 - séptimo mapa de coincidencia espacial con estadísticas de una, dos o tres fuentes;

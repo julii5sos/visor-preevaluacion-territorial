@@ -605,7 +605,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "UX-0.2.8"
+APP_VERSION = "UX-0.2.9"
 METHODOLOGY_VERSION = "MT-2026.4"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
@@ -718,30 +718,36 @@ VIS_COINCIDENCIA_REVISION = {
 VIS_RGB = {"min": 150, "max": 3200, "gamma": 1.15, "bands": ["B4", "B3", "B2"]}
 
 PERFILES_VISUALIZACION = {
-    "Panorama forestal (vista recomendada)": {
-        "descripcion": "Muestra las capas forestales principales sin que un comparador las cubra.",
+    "Consultar capas individuales": {
+        "descripcion": (
+            "Elija una o varias capas. Para JRC, ESRI y NDVI puede consultar un "
+            "solo año, sin barrido temporal."
+        ),
+        "modo": "Explorar capas",
         "comparador": "Sin comparador",
         "capas": [
             "Sectores para revisión",
             "Pérdida Hansen post-2020",
-            "Deforestación JRC",
-            "Degradación JRC",
+            "Estado forestal JRC",
         ],
     },
-    "Vista de uso del suelo": {
-        "descripcion": "Abre primero la comparación visual de coberturas ESRI.",
+    "Comparar estado forestal entre dos años (JRC TMF)": {
+        "descripcion": "Compare visualmente el estado forestal de dos años mediante el swipe.",
+        "modo": "Comparar años",
+        "comparador": "JRC TMF",
+        "capas": [],
+    },
+    "Comparar uso del suelo entre dos años (ESRI)": {
+        "descripcion": "Compare visualmente las clases de uso y cobertura de dos años.",
+        "modo": "Comparar años",
         "comparador": "ESRI LULC",
         "capas": [],
     },
-    "Vista de vegetación": {
-        "descripcion": "Abre primero los mapas de NDVI y altura del dosel.",
-        "comparador": "Sin comparador",
-        "capas": ["Altura GEDI", "ΔNDVI", "Vegetación NDVI"],
-    },
-    "Exploración visual personalizada": {
-        "descripcion": "Permite comparar años o explorar capas en modos separados, sin cambiar el cálculo.",
-        "comparador": "Sin comparador",
-        "capas": ["Altura GEDI", "Vegetación NDVI"],
+    "Comparar vigor vegetal entre dos años (NDVI)": {
+        "descripcion": "Compare clases de vigor vegetal de dos años; esta vista no modifica el índice.",
+        "modo": "Comparar años",
+        "comparador": "NDVI Sentinel-2",
+        "capas": [],
     },
 }
 
@@ -833,6 +839,10 @@ def construir_registro_metodologico(
     anio_esri_visual_inicial,
     anio_esri_visual_final,
     anio_ndvi_visual_inicial,
+    anio_ndvi_visual_final,
+    anio_tmf_capa,
+    anio_esri_capa,
+    anio_ndvi_capa,
     modo_comparador,
     capas_activas,
     resultados=None,
@@ -871,7 +881,12 @@ def construir_registro_metodologico(
                 "esri_inicial": anio_esri_visual_inicial,
                 "esri_final": anio_esri_visual_final,
                 "ndvi_inicial": anio_ndvi_visual_inicial,
-                "ndvi_final": ANO_NDVI_MAX,
+                "ndvi_final": anio_ndvi_visual_final,
+                "capas_un_ano": {
+                    "jrc": anio_tmf_capa,
+                    "esri": anio_esri_capa,
+                    "ndvi": anio_ndvi_capa,
+                },
                 "capas_disponibles": list(capas_activas),
             },
             "corte_referencia": CUTOFF_LABEL,
@@ -2126,8 +2141,8 @@ def generar_pdf(
         [
             Paragraph("Referencia metodológica", estilos["CuerpoFicha"]),
             Paragraph(
-                f"{ANO_REFERENCIA_ANALISIS} (JRC y Hansen); ESRI "
-                f"{anio_esri_inicial}-{anio_esri_final}, última serie disponible",
+                f"JRC: estado {ANO_DIAG_TMF}; Hansen: pérdida 2021-{ANO_HANSEN_MAX} "
+                f"posterior al corte {CUTOFF_LABEL}; ESRI: {ANO_ESRI_MIN}-{ANO_ESRI_MAX}",
                 estilos["CuerpoFicha"],
             ),
         ],
@@ -3172,22 +3187,21 @@ try:
             )
 
     st.sidebar.markdown("---")
-    st.sidebar.caption("Paso 2 de 2 · Elija una vista inicial")
+    st.sidebar.caption("Paso 2 de 2 · Elija cómo explorar el mapa")
     objetivo = st.sidebar.selectbox(
-        "¿Qué mapas desea ver primero?",
+        "¿Qué desea ver en el mapa?",
         list(PERFILES_VISUALIZACION),
         help=(
-            "Solo organiza el comparador y las capas que se muestran primero. "
+            "Puede consultar capas de un solo año o comparar dos años. "
             "El cálculo científico es el mismo en todas las opciones."
         ),
     )
     perfil = PERFILES_VISUALIZACION[objetivo]
     st.sidebar.caption(perfil["descripcion"])
     st.sidebar.info(
-        f"El cálculo no cambia con esta selección. Referencia metodológica "
-        f"{ANO_REFERENCIA_ANALISIS}: JRC y Hansen {ANO_REFERENCIA_ANALISIS}; "
-        f"ESRI {ANO_ESRI_MIN}-{ANO_ESRI_MAX}, última serie disponible. "
-        "Los años configurables son únicamente para visualizar comparaciones."
+        "Esta selección solo cambia el mapa. El análisis siempre usa períodos "
+        f"fijos y documentados: JRC {ANO_DIAG_TMF}, Hansen 2021-{ANO_HANSEN_MAX} "
+        f"y ESRI {ANO_ESRI_MIN}-{ANO_ESRI_MAX}."
     )
 
     opciones_capas = [
@@ -3195,6 +3209,7 @@ try:
         "Pérdida Hansen post-2020",
         "Pérdida Hansen 2001-2020",
         "Cobertura arbórea persistente",
+        "Estado forestal JRC",
         "Deforestación JRC",
         "Degradación JRC",
         "Uso y cobertura ESRI",
@@ -3208,13 +3223,14 @@ try:
         "Pérdida Hansen post-2020": "Pérdida de árboles posterior a 2020",
         "Pérdida Hansen 2001-2020": "Pérdida histórica de árboles (2001-2020)",
         "Cobertura arbórea persistente": "Cobertura arbórea persistente hasta 2020",
+        "Estado forestal JRC": "Estado forestal de un año (JRC)",
         "Deforestación JRC": "Señales de deforestación (JRC)",
         "Degradación JRC": "Señales de degradación (JRC)",
         "Uso y cobertura ESRI": "Uso y cobertura del suelo (ESRI)",
         "Transiciones ESRI": "Cambios de la clase árboles (ESRI)",
         "Altura GEDI": "Altura del dosel (GEDI)",
         "ΔNDVI": "Cambio del vigor vegetal (ΔNDVI)",
-        "Vegetación NDVI": f"Vigor vegetal en {ANO_NDVI_MAX} (NDVI)",
+        "Vegetación NDVI": "Vigor vegetal de un año (NDVI)",
     }
 
     modo_comparador = perfil["comparador"]
@@ -3226,181 +3242,173 @@ try:
     capa_visible_inicial = capas_activas[0] if capas_activas else None
     anio_tmf_inicial, anio_tmf_final = 2020, ANO_TMF_MAX
     anio_esri_inicial, anio_esri_final = ANO_ESRI_MIN, ANO_ESRI_MAX
-    anio_ndvi_inicial = 2022
+    anio_ndvi_inicial, anio_ndvi_final = 2022, ANO_NDVI_MAX
+    anio_tmf_capa = ANO_TMF_MAX
+    anio_esri_capa = ANO_ESRI_MAX
+    anio_ndvi_capa = ANO_NDVI_MAX
 
-    with st.sidebar.expander("Modo técnico · parámetros y capas", expanded=False):
-        personalizar = st.checkbox(
-            "Elegir manualmente comparador y mapas",
-            value=objetivo == "Exploración visual personalizada",
+    if modo_mapa == "Comparar años":
+        capas_activas = []
+        orden_capas_mapa = []
+        capa_visible_inicial = None
+        if modo_comparador == "JRC TMF":
+            opciones_inicio_tmf = list(range(1990, ANO_TMF_MAX))
+            anio_tmf_inicial = st.sidebar.selectbox(
+                "Año inicial (JRC):",
+                opciones_inicio_tmf,
+                index=opciones_inicio_tmf.index(2020),
+            )
+            opciones_final_tmf = list(range(anio_tmf_inicial + 1, ANO_TMF_MAX + 1))
+            anio_tmf_final = st.sidebar.selectbox(
+                "Año final (JRC):",
+                opciones_final_tmf,
+                index=len(opciones_final_tmf) - 1,
+            )
+            st.sidebar.caption(
+                f"Comparación visual. El análisis no resta estos años: clasifica el "
+                f"estado JRC de {ANO_DIAG_TMF}."
+            )
+        elif modo_comparador == "ESRI LULC":
+            opciones_inicio_esri = list(range(ANO_ESRI_MIN, ANO_ESRI_MAX))
+            anio_esri_inicial = st.sidebar.selectbox(
+                "Año inicial (ESRI):",
+                opciones_inicio_esri,
+            )
+            opciones_final_esri = list(range(anio_esri_inicial + 1, ANO_ESRI_MAX + 1))
+            anio_esri_final = st.sidebar.selectbox(
+                "Año final (ESRI):",
+                opciones_final_esri,
+                index=len(opciones_final_esri) - 1,
+            )
+            st.sidebar.caption(
+                f"El análisis usa los extremos disponibles {ANO_ESRI_MIN} y "
+                f"{ANO_ESRI_MAX}; esta selección solo cambia el comparador."
+            )
+        else:
+            opciones_inicio_ndvi = list(range(2017, ANO_NDVI_MAX))
+            anio_ndvi_inicial = st.sidebar.selectbox(
+                "Año inicial (NDVI):",
+                opciones_inicio_ndvi,
+                index=opciones_inicio_ndvi.index(2022),
+            )
+            opciones_final_ndvi = list(range(anio_ndvi_inicial + 1, ANO_NDVI_MAX + 1))
+            anio_ndvi_final = st.sidebar.selectbox(
+                "Año final (NDVI):",
+                opciones_final_ndvi,
+                index=len(opciones_final_ndvi) - 1,
+            )
+            st.sidebar.caption(
+                "Comparación visual de vigor vegetal. NDVI no suma puntos al índice de prioridad."
+            )
+    else:
+        modo_comparador = "Sin comparador"
+        st.sidebar.markdown("**Capas disponibles en el mapa**")
+        capas_seleccionadas = st.sidebar.multiselect(
+            "Seleccione una o varias capas:",
+            opciones_capas,
+            default=capas_activas,
+            format_func=lambda valor: nombres_capas[valor],
+            help=(
+                "Las capas seleccionadas permanecen en el control del mapa. Puede "
+                "encenderlas o apagarlas sin volver a agregarlas."
+            ),
         )
-        if personalizar:
-            st.info(
-                "El comparador temporal y la exploración de capas funcionan por separado. "
-                "Ninguno modifica los períodos fijos ni el resultado del diagnóstico."
+        orden_guardado = st.session_state.get("orden_capas_personalizado", [])
+        orden_capas_mapa = [
+            nombre for nombre in orden_guardado if nombre in capas_seleccionadas
+        ]
+        orden_capas_mapa.extend(
+            nombre for nombre in capas_seleccionadas if nombre not in orden_capas_mapa
+        )
+        st.session_state["orden_capas_personalizado"] = orden_capas_mapa
+        capas_activas = list(orden_capas_mapa)
+
+        if any(
+            nombre in capas_activas
+            for nombre in ("Estado forestal JRC", "Deforestación JRC", "Degradación JRC")
+        ):
+            anio_tmf_capa = st.sidebar.selectbox(
+                "Año de la capa JRC:",
+                list(range(1990, ANO_TMF_MAX + 1)),
+                index=ANO_TMF_MAX - 1990,
+                help="Muestra un solo año; no activa el comparador.",
             )
-            modo_mapa = st.radio(
-                "¿Cómo desea usar el mapa?",
-                ["Explorar capas", "Comparar años"],
-                index=0 if modo_mapa == "Explorar capas" else 1,
-                help=(
-                    "Explorar capas permite encender varias capas y ordenarlas. Comparar "
-                    "años muestra únicamente el barrido temporal para evitar que una capa "
-                    "oculte la comparación."
-                ),
+        if "Uso y cobertura ESRI" in capas_activas:
+            anio_esri_capa = st.sidebar.selectbox(
+                "Año de la capa ESRI:",
+                list(range(ANO_ESRI_MIN, ANO_ESRI_MAX + 1)),
+                index=ANO_ESRI_MAX - ANO_ESRI_MIN,
+                help="Muestra un solo año; no activa el comparador.",
             )
-            if modo_mapa == "Comparar años":
-                capas_activas = []
-                orden_capas_mapa = []
-                capa_visible_inicial = None
-                opciones_comparador = ["JRC TMF", "ESRI LULC", "NDVI Sentinel-2"]
-                comparador_inicial = (
-                    modo_comparador
-                    if modo_comparador in opciones_comparador
-                    else "JRC TMF"
+        if "Vegetación NDVI" in capas_activas:
+            anio_ndvi_capa = st.sidebar.selectbox(
+                "Año de la capa NDVI:",
+                list(range(2017, ANO_NDVI_MAX + 1)),
+                index=ANO_NDVI_MAX - 2017,
+                help="Muestra un solo año; no activa el comparador.",
+            )
+        if "ΔNDVI" in capas_activas:
+            anio_ndvi_inicial = st.sidebar.selectbox(
+                f"Año inicial del cambio NDVI (final {ANO_NDVI_MAX}):",
+                list(range(2017, ANO_NDVI_MAX)),
+                index=list(range(2017, ANO_NDVI_MAX)).index(2023),
+            )
+
+        if orden_capas_mapa:
+            with st.sidebar.expander("Orden y capa inicial", expanded=False):
+                st.caption(
+                    "La primera capa queda arriba. Las demás continúan disponibles en el mapa."
                 )
-                modo_comparador = st.selectbox(
-                    "Información que desea comparar:",
-                    opciones_comparador,
-                    index=opciones_comparador.index(comparador_inicial),
-                    help=(
-                        "JRC compara el estado del bosque; ESRI compara el uso y la "
-                        "cobertura del suelo; NDVI compara clases de vigor vegetal."
-                    ),
-                )
-                if modo_comparador == "JRC TMF":
-                    anio_tmf_inicial = st.selectbox(
-                        "Año inicial para visualizar (JRC):",
-                        list(range(1990, ANO_TMF_MAX)),
-                        index=list(range(1990, ANO_TMF_MAX)).index(2020),
-                    )
-                    anio_tmf_final = st.selectbox(
-                        "Año final para visualizar (JRC):",
-                        list(range(anio_tmf_inicial + 1, ANO_TMF_MAX + 1)),
-                        index=len(list(range(anio_tmf_inicial + 1, ANO_TMF_MAX + 1))) - 1,
-                    )
-                    st.caption(
-                        f"Estos años cambian únicamente el barrido visual. El diagnóstico "
-                        f"utiliza siempre JRC TMF {ANO_DIAG_TMF}."
-                    )
-                elif modo_comparador == "ESRI LULC":
-                    anio_esri_inicial = st.selectbox(
-                        "Año inicial para visualizar (ESRI):",
-                        list(range(ANO_ESRI_MIN, ANO_ESRI_MAX)),
-                    )
-                    anio_esri_final = st.selectbox(
-                        "Año final para visualizar (ESRI):",
-                        list(range(anio_esri_inicial + 1, ANO_ESRI_MAX + 1)),
-                        index=len(list(range(anio_esri_inicial + 1, ANO_ESRI_MAX + 1))) - 1,
-                    )
-                else:
-                    anio_ndvi_inicial = st.selectbox(
-                        "Año inicial para visualizar (NDVI):",
-                        list(range(2017, ANO_NDVI_MAX)),
-                        index=list(range(2017, ANO_NDVI_MAX)).index(2022),
-                    )
-                    st.caption(
-                        f"El lado derecho mostrará NDVI {ANO_NDVI_MAX}. Esta comparación "
-                        "es visual y no modifica el índice de prioridad."
-                    )
-            else:
-                modo_comparador = "Sin comparador"
-                capas_seleccionadas = st.multiselect(
-                    "Capas disponibles en el mapa:",
-                    opciones_capas,
-                    default=capas_activas,
+                for posicion, nombre in enumerate(orden_capas_mapa, start=1):
+                    st.caption(f"{posicion}. {nombres_capas[nombre]}")
+
+                clave_capa_mover = "capa_a_reordenar"
+                if st.session_state.get(clave_capa_mover) not in orden_capas_mapa:
+                    st.session_state[clave_capa_mover] = orden_capas_mapa[0]
+                capa_a_mover = st.selectbox(
+                    "Capa que desea mover:",
+                    orden_capas_mapa,
                     format_func=lambda valor: nombres_capas[valor],
-                    help=(
-                        "Las capas seleccionadas quedarán disponibles dentro del mapa. "
-                        "Podrá encender varias a la vez sin eliminarlas."
-                    ),
+                    key=clave_capa_mover,
                 )
-                orden_guardado = st.session_state.get(
-                    "orden_capas_personalizado",
-                    [],
-                )
-                orden_capas_mapa = [
-                    nombre for nombre in orden_guardado if nombre in capas_seleccionadas
-                ]
-                orden_capas_mapa.extend(
-                    nombre
-                    for nombre in capas_seleccionadas
-                    if nombre not in orden_capas_mapa
-                )
-                st.session_state["orden_capas_personalizado"] = orden_capas_mapa
-                capas_activas = list(orden_capas_mapa)
-
-                if orden_capas_mapa:
-                    st.markdown("**Orden visual · arriba → abajo**")
-                    st.caption(
-                        "Si enciende varias capas, la primera de esta lista se dibuja por encima de las demás."
+                columna_subir, columna_bajar = st.columns(2)
+                if columna_subir.button(
+                    "Subir",
+                    use_container_width=True,
+                    disabled=orden_capas_mapa.index(capa_a_mover) == 0,
+                ):
+                    indice = orden_capas_mapa.index(capa_a_mover)
+                    orden_capas_mapa[indice - 1], orden_capas_mapa[indice] = (
+                        orden_capas_mapa[indice],
+                        orden_capas_mapa[indice - 1],
                     )
-                    for posicion, nombre in enumerate(orden_capas_mapa, start=1):
-                        st.caption(f"{posicion}. {nombres_capas[nombre]}")
-
-                    clave_capa_mover = "capa_a_reordenar"
-                    if st.session_state.get(clave_capa_mover) not in orden_capas_mapa:
-                        st.session_state[clave_capa_mover] = orden_capas_mapa[0]
-                    capa_a_mover = st.selectbox(
-                        "Capa que desea mover:",
-                        orden_capas_mapa,
-                        format_func=lambda valor: nombres_capas[valor],
-                        key=clave_capa_mover,
+                    st.session_state["orden_capas_personalizado"] = orden_capas_mapa
+                    st.rerun()
+                if columna_bajar.button(
+                    "Bajar",
+                    use_container_width=True,
+                    disabled=orden_capas_mapa.index(capa_a_mover) == len(orden_capas_mapa) - 1,
+                ):
+                    indice = orden_capas_mapa.index(capa_a_mover)
+                    orden_capas_mapa[indice + 1], orden_capas_mapa[indice] = (
+                        orden_capas_mapa[indice],
+                        orden_capas_mapa[indice + 1],
                     )
-                    columna_subir, columna_bajar = st.columns(2)
-                    if columna_subir.button(
-                        "Subir capa",
-                        use_container_width=True,
-                        disabled=orden_capas_mapa.index(capa_a_mover) == 0,
-                    ):
-                        indice = orden_capas_mapa.index(capa_a_mover)
-                        orden_capas_mapa[indice - 1], orden_capas_mapa[indice] = (
-                            orden_capas_mapa[indice],
-                            orden_capas_mapa[indice - 1],
-                        )
-                        st.session_state["orden_capas_personalizado"] = orden_capas_mapa
-                        st.rerun()
-                    if columna_bajar.button(
-                        "Bajar capa",
-                        use_container_width=True,
-                        disabled=orden_capas_mapa.index(capa_a_mover) == len(orden_capas_mapa) - 1,
-                    ):
-                        indice = orden_capas_mapa.index(capa_a_mover)
-                        orden_capas_mapa[indice + 1], orden_capas_mapa[indice] = (
-                            orden_capas_mapa[indice],
-                            orden_capas_mapa[indice + 1],
-                        )
-                        st.session_state["orden_capas_personalizado"] = orden_capas_mapa
-                        st.rerun()
+                    st.session_state["orden_capas_personalizado"] = orden_capas_mapa
+                    st.rerun()
 
-                    clave_capa_inicial = "capa_visible_inicial_personalizada"
-                    if st.session_state.get(clave_capa_inicial) not in orden_capas_mapa:
-                        st.session_state[clave_capa_inicial] = orden_capas_mapa[0]
-                    capa_visible_inicial = st.selectbox(
-                        "Capa visible al abrir el mapa:",
-                        orden_capas_mapa,
-                        format_func=lambda valor: nombres_capas[valor],
-                        key=clave_capa_inicial,
-                        help="Las demás capas permanecen disponibles en el control del mapa.",
-                    )
-                else:
-                    capa_visible_inicial = None
-                    st.warning("Seleccione al menos una capa para mostrar información temática.")
-
-                anio_ndvi_inicial = st.selectbox(
-                    "Año inicial para visualizar el cambio NDVI:",
-                    list(range(2017, ANO_NDVI_MAX)),
-                    index=list(range(2017, ANO_NDVI_MAX)).index(2022),
-                    disabled="ΔNDVI" not in capas_activas,
+                clave_capa_inicial = "capa_visible_inicial_personalizada"
+                if st.session_state.get(clave_capa_inicial) not in orden_capas_mapa:
+                    st.session_state[clave_capa_inicial] = orden_capas_mapa[0]
+                capa_visible_inicial = st.selectbox(
+                    "Capa visible al abrir:",
+                    orden_capas_mapa,
+                    format_func=lambda valor: nombres_capas[valor],
+                    key=clave_capa_inicial,
                 )
         else:
-            if modo_mapa == "Comparar años":
-                capas_activas = []
-                orden_capas_mapa = []
-                capa_visible_inicial = None
-            st.caption(
-                "La vista recomendada mantiene separados el comparador temporal y "
-                "las capas temáticas. Estos mapas no modifican el cálculo."
-            )
+            capa_visible_inicial = None
+            st.sidebar.warning("Seleccione al menos una capa temática.")
 
     firma_analisis_actual = (
         tipo_area,
@@ -3419,6 +3427,10 @@ try:
         anio_esri_inicial,
         anio_esri_final,
         anio_ndvi_inicial,
+        anio_ndvi_final,
+        anio_tmf_capa,
+        anio_esri_capa,
+        anio_ndvi_capa,
         tuple(orden_capas_mapa),
         capa_visible_inicial,
     )
@@ -3449,8 +3461,8 @@ try:
     st.markdown(
         f"""
         <div class="paso-guia"><b>Configuración lista.</b> La vista elegida solo organiza
-        los mapas. El cálculo utilizará el mismo método <b>{METHODOLOGY_VERSION}</b> con
-        referencia <b>{ANO_REFERENCIA_ANALISIS}</b>. Pulse <b>Ejecutar análisis</b> y revise
+        los mapas. El cálculo utilizará siempre el mismo método <b>{METHODOLOGY_VERSION}</b>
+        y sus períodos fijos. Pulse <b>Ejecutar análisis</b> y revise
         después la evidencia cartográfica.</div>
         """,
         unsafe_allow_html=True,
@@ -3461,11 +3473,31 @@ try:
             f"""
             - **ΔNDVI {anio_ndvi_inicial} → {ANO_NDVI_MAX}:** muestra cuánto cambió el vigor
               vegetal entre ambos años. Rojo indica disminución y verde indica aumento.
-            - **Vegetación {ANO_NDVI_MAX}:** muestra la condición del vigor vegetal únicamente
-              en {ANO_NDVI_MAX}. No representa un cambio y no distingue por sí sola entre bosque,
+            - **Vegetación {anio_ndvi_capa}:** muestra la condición del vigor vegetal únicamente
+              en {anio_ndvi_capa}. No representa un cambio y no distingue por sí sola entre bosque,
               cultivo o pastizal denso.
 
             GEDI aporta el componente estructural —altura del dosel— que NDVI no puede determinar.
+            """
+        )
+
+    with st.expander("¿Por qué aparecen los períodos 2020-2025 y 2017-2024?", expanded=False):
+        st.markdown(
+            f"""
+            - **JRC 2020-2025 en el comparador:** es una lectura visual desde el año del
+              corte de referencia EUDR ({CUTOFF_LABEL}) hasta el estado forestal más
+              reciente disponible ({ANO_DIAG_TMF}). **No es la operación que calcula la
+              señal JRC.** El análisis lee la banda `Dec{ANO_DIAG_TMF}` y mide los píxeles
+              clasificados por JRC como degradación o deforestación.
+            - **Hansen 2021-{ANO_HANSEN_MAX}:** identifica pérdidas arbóreas posteriores
+              al 31/12/2020. Es la fuente que aplica explícitamente el corte temporal post-2020.
+            - **ESRI {ANO_ESRI_MIN}-{ANO_ESRI_MAX}:** el análisis compara los extremos de
+              la serie configurada y mide dónde la clase árboles de {ANO_ESRI_MIN} cambió
+              a otra clase en {ANO_ESRI_MAX}. El año {ANO_ESRI_MAX} es el último disponible
+              en esta configuración.
+
+            Los años elegidos por el usuario en el mapa son solo para exploración visual;
+            no alteran esos períodos del análisis.
             """
         )
 
@@ -3473,9 +3505,9 @@ try:
     st.caption(
         "Primero se calcularán únicamente las señales y el resumen. El informe con siete mapas "
         "se preparará después, solo si usted lo solicita. "
-        f"Referencia fija {ANO_REFERENCIA_ANALISIS}: JRC y Hansen "
-        f"{ANO_REFERENCIA_ANALISIS}, con ESRI {ANO_ESRI_MIN}-{ANO_ESRI_MAX}. "
-        "Los años elegidos en el modo técnico solo modifican la visualización."
+        f"Períodos fijos: estado JRC {ANO_DIAG_TMF}, Hansen 2021-{ANO_HANSEN_MAX} "
+        f"posterior al corte {CUTOFF_LABEL} y ESRI {ANO_ESRI_MIN}-{ANO_ESRI_MAX}. "
+        "Los años elegidos en el mapa solo modifican la visualización."
     )
     entregables_contenedor = st.empty()
     if not analisis_actual:
@@ -3529,6 +3561,10 @@ try:
             anio_esri_visual_inicial=anio_esri_inicial,
             anio_esri_visual_final=anio_esri_final,
             anio_ndvi_visual_inicial=anio_ndvi_inicial,
+            anio_ndvi_visual_final=anio_ndvi_final,
+            anio_tmf_capa=anio_tmf_capa,
+            anio_esri_capa=anio_esri_capa,
+            anio_ndvi_capa=anio_ndvi_capa,
             modo_comparador=modo_comparador,
             capas_activas=capas_activas,
             resultados=resultados,
@@ -3760,7 +3796,7 @@ try:
         )
     elif modo_comparador == "NDVI Sentinel-2":
         etiqueta_inicial = f"NDVI {anio_ndvi_inicial}"
-        etiqueta_final = f"NDVI {ANO_NDVI_MAX}"
+        etiqueta_final = f"NDVI {anio_ndvi_final}"
         capa_izquierda = capa_gee(
             mapa,
             clasificar_ndvi(obtener_ndvi(anio_ndvi_inicial, geometria)),
@@ -3771,7 +3807,7 @@ try:
         )
         capa_derecha = capa_gee(
             mapa,
-            clasificar_ndvi(obtener_ndvi(ANO_NDVI_MAX, geometria)),
+            clasificar_ndvi(obtener_ndvi(anio_ndvi_final, geometria)),
             VIS_NDVI_CLASES,
             etiqueta_final,
             control=False,
@@ -3854,26 +3890,34 @@ try:
             VIS_LINEA_BASE,
             "Cobertura arbórea persistente",
         )
+
+    if "Estado forestal JRC" in capas_activas:
+        agregar_tematica(
+            "Estado forestal JRC",
+            obtener_tmf(anio_tmf_capa, geometria),
+            VIS_TMF,
+            f"Estado forestal JRC {anio_tmf_capa}",
+        )
     if "Deforestación JRC" in capas_activas:
         agregar_tematica(
             "Deforestación JRC",
-            obtener_tmf(ANO_DIAG_TMF, geometria).eq(3).selfMask(),
+            obtener_tmf(anio_tmf_capa, geometria).eq(3).selfMask(),
             VIS_TMF_DEFOR,
-            f"Deforestación JRC {ANO_DIAG_TMF}",
+            f"Deforestación JRC {anio_tmf_capa}",
         )
     if "Degradación JRC" in capas_activas:
         agregar_tematica(
             "Degradación JRC",
-            obtener_tmf(ANO_DIAG_TMF, geometria).eq(2).selfMask(),
+            obtener_tmf(anio_tmf_capa, geometria).eq(2).selfMask(),
             VIS_TMF_DEGRAD,
-            f"Degradación JRC {ANO_DIAG_TMF}",
+            f"Degradación JRC {anio_tmf_capa}",
         )
     if "Uso y cobertura ESRI" in capas_activas:
         agregar_tematica(
             "Uso y cobertura ESRI",
-            obtener_esri_visual(anio_esri_final, geometria),
+            obtener_esri_visual(anio_esri_capa, geometria),
             VIS_ESRI,
-            f"Uso y cobertura ESRI {anio_esri_final}",
+            f"Uso y cobertura ESRI {anio_esri_capa}",
         )
     if "Transiciones ESRI" in capas_activas:
         esri_i = obtener_esri(anio_esri_inicial, geometria)
@@ -3900,7 +3944,7 @@ try:
             "Altura del dosel GEDI",
         )
     ndvi_final = None
-    if "ΔNDVI" in capas_activas or "Vegetación NDVI" in capas_activas:
+    if "ΔNDVI" in capas_activas:
         ndvi_final = obtener_ndvi(ANO_NDVI_MAX, geometria)
     if "ΔNDVI" in capas_activas:
         ndvi_inicial = obtener_ndvi(anio_ndvi_inicial, geometria)
@@ -3914,9 +3958,9 @@ try:
     if "Vegetación NDVI" in capas_activas:
         agregar_tematica(
             "Vegetación NDVI",
-            clasificar_ndvi(ndvi_final),
+            clasificar_ndvi(obtener_ndvi(anio_ndvi_capa, geometria)),
             VIS_NDVI_CLASES,
-            f"Vegetación NDVI {ANO_NDVI_MAX}",
+            f"Vegetación NDVI {anio_ndvi_capa}",
         )
 
     cuenca = ee.FeatureCollection(ASSET_CUENCA)
@@ -3998,7 +4042,9 @@ try:
         key=(
             f"mapa-{APP_VERSION}-{tipo_area}-{finca_seleccionada}-{modo_mapa}-{modo_comparador}-"
             f"{anio_tmf_inicial}-{anio_tmf_final}-{anio_esri_inicial}-"
-            f"{anio_esri_final}-{anio_ndvi_inicial}-{'-'.join(orden_capas_mapa)}-"
+            f"{anio_esri_final}-{anio_ndvi_inicial}-{anio_ndvi_final}-"
+            f"{anio_tmf_capa}-{anio_esri_capa}-{anio_ndvi_capa}-"
+            f"{'-'.join(orden_capas_mapa)}-"
             f"{capa_visible_inicial}-"
             f"{hash(geometria_dibujada_json or '')}"
         ),
@@ -4012,11 +4058,22 @@ try:
         for nombre in capas_activas:
             if nombre in LEYENDAS:
                 leyendas_activas.append((nombres_capas.get(nombre, nombre), LEYENDAS[nombre]))
+            elif nombre == "Estado forestal JRC":
+                leyendas_activas.append((nombres_capas[nombre], LEYENDAS["JRC TMF"]))
             elif nombre == "Uso y cobertura ESRI":
                 leyendas_activas.append((nombres_capas[nombre], LEYENDAS["ESRI LULC"]))
         for indice, (titulo, elementos) in enumerate(leyendas_activas):
             with columnas_leyenda[indice % 2]:
                 mostrar_leyenda(titulo, elementos)
+
+    if modo_comparador == "NDVI Sentinel-2":
+        periodo_ndvi_visual = f"{anio_ndvi_inicial}-{anio_ndvi_final}"
+    elif "ΔNDVI" in capas_activas:
+        periodo_ndvi_visual = f"{anio_ndvi_inicial}-{ANO_NDVI_MAX}"
+    elif "Vegetación NDVI" in capas_activas:
+        periodo_ndvi_visual = str(anio_ndvi_capa)
+    else:
+        periodo_ndvi_visual = f"hasta {ANO_NDVI_MAX}"
 
     with st.expander("Metodología y reproducibilidad", expanded=False):
         st.markdown(f"**Metodología aplicada:** {METHODOLOGY_VERSION}")
@@ -4032,7 +4089,21 @@ try:
                 | Hansen Global Forest Change | 2001-{ANO_HANSEN_MAX}; corte {CUTOFF_LABEL} | 30 m | Pérdida de cobertura arbórea |
                 | ESRI Land Use/Land Cover | Diagnóstico {ANO_ESRI_MIN}-{ANO_ESRI_MAX} | 10 m | Transiciones de la clase árboles |
                 | GEDI / OpenForis | Producto disponible | 100 m | Altura y cobertura válida del dosel |
-                | Sentinel-2 SR Harmonized | {anio_ndvi_inicial}-{ANO_NDVI_MAX} | 10 m | Vigor vegetal; apoyo visual |
+                | Sentinel-2 SR Harmonized | {periodo_ndvi_visual} | 10 m | Vigor vegetal; apoyo visual |
+                """
+            )
+            st.markdown(
+                f"""
+                **Cómo se interpretan los períodos**
+
+                - JRC aporta el **estado forestal de {ANO_DIAG_TMF}**. La señal se obtiene
+                  de sus clases de degradación y deforestación; no de una resta 2020-2025.
+                - Hansen aporta la pérdida anual **posterior al 31/12/2020**, es decir,
+                  2021-{ANO_HANSEN_MAX}.
+                - ESRI compara la clase árboles entre **{ANO_ESRI_MIN} y {ANO_ESRI_MAX}**,
+                  los extremos de la serie utilizada por el análisis.
+                - Los años seleccionables del mapa son parámetros de visualización y no
+                  cambian el índice de prioridad.
                 """
             )
             with st.expander("Identificadores técnicos de los datos", expanded=False):
@@ -4086,9 +4157,8 @@ try:
             )
             st.caption(
                 "Todos los años seleccionables cambian únicamente la visualización. "
-                f"El diagnóstico conserva la referencia {ANO_REFERENCIA_ANALISIS}: JRC y "
-                f"Hansen {ANO_REFERENCIA_ANALISIS}, y ESRI {ANO_ESRI_MIN}-{ANO_ESRI_MAX} "
-                "por ser la última serie disponible."
+                f"El diagnóstico conserva JRC {ANO_DIAG_TMF}, Hansen 2021-{ANO_HANSEN_MAX} "
+                f"posterior al corte {CUTOFF_LABEL} y ESRI {ANO_ESRI_MIN}-{ANO_ESRI_MAX}."
             )
             st.markdown("**Lectura de consistencia entre fuentes**")
             st.markdown(
