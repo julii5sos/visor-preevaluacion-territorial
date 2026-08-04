@@ -605,7 +605,7 @@ st.markdown(
 # Configuración centralizada
 # -----------------------------------------------------------------------------
 
-APP_VERSION = "UX-0.2.9"
+APP_VERSION = "UX-0.2.10"
 METHODOLOGY_VERSION = "MT-2026.4"
 PROYECTO_EE = st.secrets.get("EE_PROJECT", "ee-julissaguevaravega")
 
@@ -1223,11 +1223,17 @@ def obtener_limites(objeto):
 
 
 def obtener_tmf(anio, geometria):
+    coleccion_tmf = ee.ImageCollection(TMF_ASSET).filterBounds(geometria)
+    proyeccion_tmf = (
+        ee.Image(coleccion_tmf.first())
+        .select(f"Dec{anio}")
+        .projection()
+    )
     return (
-        ee.ImageCollection(TMF_ASSET)
-        .filterBounds(geometria)
+        coleccion_tmf
         .mosaic()
         .select(f"Dec{anio}")
+        .setDefaultProjection(proyeccion_tmf)
         .rename(f"tmf_{anio}")
         .clip(geometria)
     )
@@ -1235,12 +1241,17 @@ def obtener_tmf(anio, geometria):
 
 def obtener_esri(anio, geometria):
     anio_seguro = max(ANO_ESRI_MIN, min(ANO_ESRI_MAX, anio))
-    return (
+    coleccion_esri = (
         ee.ImageCollection(ESRI_ASSET)
         .filterBounds(geometria)
         .filterDate(f"{anio_seguro}-01-01", f"{anio_seguro}-12-31")
+    )
+    proyeccion_esri = ee.Image(coleccion_esri.first()).select(0).projection()
+    return (
+        coleccion_esri
         .mosaic()
         .select(0)
+        .setDefaultProjection(proyeccion_esri)
         .rename(f"esri_{anio_seguro}")
         .clip(geometria)
     )
@@ -1385,6 +1396,7 @@ def imagen_coincidencia_revision(
         esri_final = obtener_esri(ANO_ESRI_MAX, geometria)
 
     proyeccion_referencia = ee.Image(tmf).projection()
+    proyeccion_esri = ee.Image(esri_inicial).projection()
     senal_jrc = (
         ee.Image(tmf)
         .eq(2)
@@ -1404,6 +1416,7 @@ def imagen_coincidencia_revision(
         .eq(2)
         .And(ee.Image(esri_final).neq(2))
         .unmask(0)
+        .setDefaultProjection(proyeccion_esri)
     )
     senal_esri = (
         senal_esri_10m.reduceResolution(

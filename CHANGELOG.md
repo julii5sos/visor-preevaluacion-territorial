@@ -4,7 +4,17 @@ Este historial documenta la evolución de la aplicación UX. Las versiones sigue
 el formato `MAJOR.MINOR.PATCH`: una versión principal, mejoras compatibles y
 correcciones compatibles, respectivamente.
 
-## [0.2.9] - 2026-08-03 — versión actual
+## [0.2.10] - 2026-08-03 — versión actual
+
+### Proyección explícita para mosaicos de Earth Engine
+
+- Los mosaicos JRC TMF y ESRI conservan la proyección nativa de su primera
+  imagen antes de cualquier operación espacial.
+- La señal ESRI establece nuevamente esa proyección antes de ejecutar
+  `reduceResolution`, evitando el error de proyección predeterminada inválida.
+- El índice, sus pesos, umbrales y períodos metodológicos no cambian.
+
+## [0.2.9] - 2026-08-03
 
 ### Vistas y períodos comprensibles
 
