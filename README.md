@@ -2,7 +2,7 @@
 
 Aplicación Streamlit para identificar señales territoriales, priorizar revisiones y
 generar una ficha PDF con resultados y mapas temáticos. Es una herramienta de apoyo:
-no constituye una certificación, una validación de campo ni una determinación de
+no constituye una certificación, una sustitución de validación de campo ni una determinación de
 cumplimiento EUDR.
 
 ## Versión actual
